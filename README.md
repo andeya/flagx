@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
-    "github.com/stretchr/testify/assert"
-    "github.com/henrylee2cn/flagx"
+	"github.com/stretchr/testify/assert"
+	"github.com/henrylee2cn/flagx"
 )
 
 func TestContinueOnUndefined(t *testing.T) {
