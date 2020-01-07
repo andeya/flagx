@@ -14,7 +14,7 @@ func TestContinueOnUndefined(t *testing.T) {
 	run := fs.String("test.run", "", "")
 	err := fs.Parse(os.Args[1:])
 	assert.NotNil(t, err)
-	t.Log(err)
+	assert.True(t, strings.Contains(err.Error(), "flag provided but not defined:"))
 
 	fs = NewFlagSet(os.Args[0], ContinueOnError|ContinueOnUndefined)
 	run = fs.String("test.run", "", "")
@@ -24,17 +24,16 @@ func TestContinueOnUndefined(t *testing.T) {
 }
 
 func TestStructVars(t *testing.T) {
-	fs := NewFlagSet(os.Args[0], ContinueOnError|ContinueOnUndefined)
 	type Args struct {
 		Run     string        `flag:"test.run; def=.*; usage=function name pattern"`
 		Timeout time.Duration `flag:"test.timeout"`
 	}
 	var args Args
-	err := fs.StructVars(&args)
+	err := StructVars(&args)
 	assert.NoError(t, err)
-	err = fs.Parse(os.Args[1:])
+	Parse()
 	assert.NoError(t, err)
 	assert.True(t, strings.Contains(args.Run, "TestStructVars"))
 	t.Logf("%+v", args)
-	fs.Usage()
+	PrintDefaults()
 }
