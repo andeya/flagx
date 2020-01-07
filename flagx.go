@@ -2,7 +2,11 @@ package flagx
 
 import (
 	"flag"
+	"fmt"
+	"reflect"
 	"strings"
+
+	"github.com/henrylee2cn/goutil"
 )
 
 type (
@@ -47,15 +51,48 @@ const (
 	ContinueOnUndefined ErrorHandling = 1 << 30              // Ignore provided but undefined flags
 )
 
+// struct tags are used by *FlagSet.StructVars.
+const (
+	tagNameFlag       = "flag"
+	tagKeyOmit        = "-"
+	tagKeyNameDefault = "def"
+	tagKeyNameUsage   = "usage"
+)
+
 // NewFlagSet returns a new, empty flag set with the specified name and
 // error handling property. If the name is not empty, it will be printed
 // in the default usage message and in error messages.
 func NewFlagSet(name string, errorHandling ErrorHandling) *FlagSet {
-	var fs = new(FlagSet)
-	fs.errorHandling = errorHandling
-	errorHandling, fs.isContinueOnUndefined = cleanBit(errorHandling, ContinueOnUndefined)
-	fs.FlagSet = flag.NewFlagSet(name, errorHandling)
-	return fs
+	f := new(FlagSet)
+	f.Init(name, errorHandling)
+	return f
+}
+
+// Init sets the name and error handling property for a flag set.
+// By default, the zero FlagSet uses an empty name and the
+// ContinueOnError error handling policy.
+func (f *FlagSet) Init(name string, errorHandling ErrorHandling) {
+	f.errorHandling = errorHandling
+	errorHandling, f.isContinueOnUndefined = cleanBit(errorHandling, ContinueOnUndefined)
+	if f.FlagSet == nil {
+		f.FlagSet = flag.NewFlagSet(name, errorHandling)
+	} else {
+		f.FlagSet.Init(name, errorHandling)
+	}
+}
+
+// StructVars defines flags based on struct tags and binds to fields.
+// NOTE:
+//  Not support nested fields
+func (f *FlagSet) StructVars(p interface{}) error {
+	v := reflect.ValueOf(p)
+	if v.Kind() == reflect.Ptr {
+		v = goutil.DereferenceValue(v)
+		if v.Kind() == reflect.Struct {
+			return f.varFromStruct(v)
+		}
+	}
+	return fmt.Errorf("flagx: want struct pointer parameter, but got %T", p)
 }
 
 // Parse parses flag definitions from the argument list, which should not
