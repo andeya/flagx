@@ -42,7 +42,7 @@ func TestStructVars(t *testing.T) {
 	assert.NoError(t, err)
 	err = fs.Parse(os.Args[1:])
 	assert.NoError(t, err)
-	assert.NotEmpty(t, args.Run)
+	assert.True(t, strings.Contains(args.Run, "TestStructVars"))
 	t.Logf("%+v", args)
 	fs.Usage()
 }
