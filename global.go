@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+// Lookup lookups the value corresponding to the name
+// directly from the arguments.
+func Lookup(arguments []string, name string) (value string, found bool) {
+	kv := filterArgs(arguments, []string{name})
+	if len(kv) >= 2 {
+		return kv[1], true
+	}
+	return "", false
+}
+
 // CommandLine is the default set of command-line flags, parsed from os.Args.
 // The top-level functions such as BoolVar, Arg, and so on are wrappers for the
 // methods of CommandLine.

@@ -7,6 +7,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestLookup(t *testing.T) {
+	var args = []string{"-run", "abc", "-t", "5s", "-Cool", "true", "-v", "false", "-N", "1"}
+	v, ok := Lookup(args, "Cool")
+	assert.True(t, ok)
+	assert.Equal(t, "true", v)
+	v, ok = Lookup(args, "???")
+	assert.False(t, ok)
+	assert.Equal(t, "", v)
+}
+
 func TestUnquoteUsage(t *testing.T) {
 	type Args struct {
 		StringFlag   string        `flag:"StringFlag; def=.*; usage=function name pattern"`
