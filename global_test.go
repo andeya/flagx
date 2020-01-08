@@ -7,12 +7,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLookup(t *testing.T) {
-	var args = []string{"-run", "abc", "-t", "5s", "-Cool", "true", "-v", "false", "-N", "1"}
-	v, ok := Lookup(args, "Cool")
+func TestLookupArgs(t *testing.T) {
+	var args = []string{"-run", "abc", "-t", "5s", "-Cool", "-N", "1"}
+
+	v, ok := LookupArgs(args, "run")
 	assert.True(t, ok)
-	assert.Equal(t, "true", v)
-	v, ok = Lookup(args, "???")
+	assert.Equal(t, "abc", v)
+
+	v, ok = LookupArgs(args, "t")
+	assert.True(t, ok)
+	assert.Equal(t, "5s", v)
+
+	v, ok = LookupArgs(args, "Cool")
+	assert.True(t, ok)
+	assert.Equal(t, "", v)
+
+	v, ok = LookupArgs(args, "N")
+	assert.True(t, ok)
+	assert.Equal(t, "1", v)
+
+	v, ok = LookupArgs(args, "???")
 	assert.False(t, ok)
 	assert.Equal(t, "", v)
 }

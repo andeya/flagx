@@ -3,6 +3,7 @@ package flagx
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,22 +60,106 @@ func (f *FlagSet) varFromStruct(v reflect.Value) error {
 		if len(names) == 0 {
 			names = append(names, ft.Name)
 		}
-		for _, name := range names {
-			err := f.varReflectValue(fvElem, name, def, usage)
-			if err != nil {
-				return err
-			}
+		err := f.varReflectValue(fvElem, names, def, usage)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (f *FlagSet) varReflectValue(elem reflect.Value, name, def, usage string) error {
-	val, err := newAnyValue(elem, def)
-	if err != nil {
-		return err
+func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage string) error {
+	var err error
+	val := elem.Addr().Interface()
+	kind := elem.Kind()
+	switch kind {
+	case reflect.String:
+		for _, name := range names {
+			f.FlagSet.StringVar(val.(*string), name, def, usage)
+		}
+	case reflect.Bool:
+		var b bool
+		if def != "" {
+			b, err = strconv.ParseBool(def)
+			if err != nil {
+				return fmt.Errorf("flagx: %q cannot be converted to bool", def)
+			}
+		}
+		for _, name := range names {
+			f.FlagSet.BoolVar(val.(*bool), name, b, usage)
+		}
+	case reflect.Float64:
+		var b float64
+		if def != "" {
+			b, err = strconv.ParseFloat(def, 64)
+			if err != nil {
+				return fmt.Errorf("flagx: %q cannot be converted to float64", def)
+			}
+		}
+		for _, name := range names {
+			f.FlagSet.Float64Var(val.(*float64), name, b, usage)
+		}
+	case reflect.Int:
+		var b int
+		if def != "" {
+			b, err = strconv.Atoi(def)
+			if err != nil {
+				return fmt.Errorf("flagx: %q cannot be converted to int", def)
+			}
+		}
+		for _, name := range names {
+			f.FlagSet.IntVar(val.(*int), name, b, usage)
+		}
+	case reflect.Int64:
+		if tpack.RuntimeTypeID(elem.Type()) == timeDurationTypeID {
+			var b time.Duration
+			if def != "" {
+				b, err = time.ParseDuration(def)
+				if err != nil {
+					return fmt.Errorf("flagx: %q cannot be converted to time.Duration", def)
+				}
+			}
+			for _, name := range names {
+				f.FlagSet.DurationVar(val.(*time.Duration), name, b, usage)
+			}
+		} else {
+			var b int64
+			if def != "" {
+				b, err = strconv.ParseInt(def, 10, 64)
+				if err != nil {
+					return fmt.Errorf("flagx: %q cannot be converted to int64", def)
+				}
+			}
+			for _, name := range names {
+				f.FlagSet.Int64Var(val.(*int64), name, b, usage)
+			}
+		}
+	case reflect.Uint:
+		var b uint
+		if def != "" {
+			b2, err := strconv.ParseUint(def, 10, 64)
+			if err != nil {
+				return fmt.Errorf("flagx: %q cannot be converted to uint", def)
+			}
+			b = uint(b2)
+		}
+		for _, name := range names {
+			f.FlagSet.UintVar(val.(*uint), name, b, usage)
+		}
+	case reflect.Uint64:
+		var b uint64
+		if def != "" {
+			b, err = strconv.ParseUint(def, 10, 64)
+			if err != nil {
+				return fmt.Errorf("flagx: %q cannot be converted to uint64", def)
+			}
+		}
+		for _, name := range names {
+			f.FlagSet.Uint64Var(val.(*uint64), name, b, usage)
+		}
+	default:
+		return fmt.Errorf("flagx: not support field type %s", elem.Type().String())
 	}
-	f.FlagSet.Var(val, name, usage)
 	return nil
 }
 

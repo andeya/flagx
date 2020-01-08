@@ -2,19 +2,29 @@ package flagx
 
 import (
 	"flag"
+	"fmt"
 	"os"
-	"strings"
 	"time"
 )
 
-// Lookup lookups the value corresponding to the name
+// LookupArgs lookups the value corresponding to the name
 // directly from the arguments.
-func Lookup(arguments []string, name string) (value string, found bool) {
+func LookupArgs(arguments []string, name string) (value string, found bool) {
 	kv := filterArgs(arguments, []string{name})
-	if len(kv) >= 2 {
+	switch len(kv) {
+	case 0:
+		return "", false
+	case 1:
+		return "", true
+	default:
 		return kv[1], true
 	}
-	return "", false
+}
+
+// Lookup returns the Flag structure of the named command-line flag,
+// returning nil if none exists.
+func Lookup(name string) *Flag {
+	return CommandLine.Lookup(name)
 }
 
 // CommandLine is the default set of command-line flags, parsed from os.Args.
@@ -126,6 +136,20 @@ func Parsed() bool {
 	return CommandLine.Parsed()
 }
 
+// Usage prints the default usage message.
+func Usage() {
+	if CommandLine.Usage != nil {
+		CommandLine.Usage()
+	} else {
+		if CommandLine.Name() == "" {
+			fmt.Fprintf(CommandLine.Output(), "Usage:\n")
+		} else {
+			fmt.Fprintf(CommandLine.Output(), "Usage of %s:\n", CommandLine.Name())
+		}
+		CommandLine.PrintDefaults()
+	}
+}
+
 // PrintDefaults prints, to standard error unless configured otherwise,
 // a usage message showing the default settings of all defined
 // command-line flags.
@@ -205,25 +229,7 @@ func UintVar(p *uint, name string, value uint, usage string) {
 // If there are no back quotes, the name is an educated guess of the
 // type of the flag's value, or the empty string if the flag is boolean.
 func UnquoteUsage(f *Flag) (name string, usage string) {
-	name, usage = flag.UnquoteUsage(f)
-	if name != "value" || strings.Contains(f.Usage, "`"+name+"`") {
-		return
-	}
-	switch f.Value.(type) {
-	case *boolValue:
-		name = ""
-	case *durationValue:
-		name = "duration"
-	case *float64Value:
-		name = "float"
-	case *intValue:
-		name = "int"
-	case *stringValue:
-		name = "string"
-	case *uintValue:
-		name = "uint"
-	}
-	return
+	return flag.UnquoteUsage(f)
 }
 
 // Var defines a flag with the specified name and usage string. The type and
