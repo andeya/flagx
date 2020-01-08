@@ -51,14 +51,6 @@ const (
 	ContinueOnUndefined ErrorHandling = 1 << 30              // Ignore provided but undefined flags
 )
 
-// struct tags are used by *FlagSet.StructVars.
-const (
-	tagNameFlag       = "flag"
-	tagKeyOmit        = "-"
-	tagKeyNameDefault = "def"
-	tagKeyNameUsage   = "usage"
-)
-
 // NewFlagSet returns a new, empty flag set with the specified name and
 // error handling property. If the name is not empty, it will be printed
 // in the default usage message and in error messages.

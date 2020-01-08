@@ -11,6 +11,14 @@ import (
 	"github.com/henrylee2cn/goutil/tpack"
 )
 
+// struct tags are used by *FlagSet.StructVars.
+const (
+	tagNameFlag       = "flag"
+	tagKeyOmit        = "-"
+	tagKeyNameDefault = "def"
+	tagKeyNameUsage   = "usage"
+)
+
 var timeDurationTypeID = tpack.Unpack(time.Duration(0)).RuntimeTypeID()
 
 func (f *FlagSet) varFromStruct(v reflect.Value) error {
