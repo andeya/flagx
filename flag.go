@@ -76,8 +76,12 @@ func (f *FlagSet) Init(name string, errorHandling ErrorHandling) {
 	errorHandling, f.isContinueOnUndefined = cleanBit(errorHandling, ContinueOnUndefined)
 	if f.FlagSet == nil {
 		f.FlagSet = flag.NewFlagSet(name, errorHandling)
+		f.FlagSet.Usage = f.defaultUsage
 	} else {
 		f.FlagSet.Init(name, errorHandling)
+		if f.FlagSet.Usage == nil {
+			f.FlagSet.Usage = f.defaultUsage
+		}
 	}
 }
 
@@ -108,6 +112,66 @@ func (f *FlagSet) Parse(arguments []string) error {
 		arguments = filterArgs(arguments, names)
 	}
 	return f.FlagSet.Parse(arguments)
+}
+
+// PrintDefaults prints, to standard error unless configured otherwise, the
+// default values of all defined command-line flags in the set. See the
+// documentation for the global function PrintDefaults for more information.
+func (f *FlagSet) PrintDefaults() {
+	f.VisitAll(func(flag *Flag) {
+		s := fmt.Sprintf("  -%s", flag.Name) // Two spaces before -; see next two comments.
+		name, usage := UnquoteUsage(flag)
+		if len(name) > 0 {
+			s += " " + name
+		}
+		// Boolean flags of one ASCII letter are so common we
+		// treat them specially, putting their usage on the same line.
+		if len(s) <= 4 { // space, space, '-', 'x'.
+			s += "\t"
+		} else {
+			// Four spaces before the tab triggers good alignment
+			// for both 4- and 8-space tab stops.
+			s += "\n    \t"
+		}
+		s += strings.ReplaceAll(usage, "\n", "\n    \t")
+
+		if !isZeroValue(flag, flag.DefValue) {
+			if _, ok := flag.Value.(*stringValue); ok {
+				// put quotes on the value
+				s += fmt.Sprintf(" (default %q)", flag.DefValue)
+			} else {
+				s += fmt.Sprintf(" (default %v)", flag.DefValue)
+			}
+		}
+		fmt.Fprint(f.Output(), s, "\n")
+	})
+}
+
+// defaultUsage is the default function to print a usage message.
+func (f *FlagSet) defaultUsage() {
+	name := f.FlagSet.Name()
+	if name == "" {
+		fmt.Fprintf(f.Output(), "Usage:\n")
+	} else {
+		fmt.Fprintf(f.Output(), "Usage of %s:\n", name)
+	}
+	f.PrintDefaults()
+}
+
+// isZeroValue determines whether the string represents the zero
+// value for a flag.
+func isZeroValue(flag *Flag, value string) bool {
+	// Build a zero value of the flag's Value type, and see if the
+	// result of calling its String method equals the value passed in.
+	// This works unless the Value type is itself an interface type.
+	typ := reflect.TypeOf(flag.Value)
+	var z reflect.Value
+	if typ.Kind() == reflect.Ptr {
+		z = reflect.New(typ.Elem())
+	} else {
+		z = reflect.Zero(typ)
+	}
+	return value == z.Interface().(Value).String()
 }
 
 func filterArgs(args, names []string) []string {

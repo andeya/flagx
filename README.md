@@ -6,6 +6,15 @@ Standard flag package extension with more free usage.
 
 - Add `const ContinueOnUndefined ErrorHandling` to ignore provided but undefined flags
 - Add `*FlagSet.StructVars` to define flags based on struct tags and bind to fields
+  - The list of supported types is consistent with the standard package:
+    - `string`
+    - `bool`
+    - `int`
+    - `int64`
+    - `uint`
+    - `uint64`
+    - `float64`
+    - `time.Duration`
 - For more features, please open the issue
 
 ## Test Demo

@@ -1,36 +1,49 @@
 package flagx
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/henrylee2cn/goutil/tpack"
 )
 
-func newAnyValue(elem reflect.Value) (Value, error) {
+func newAnyValue(elem reflect.Value, def string) (Value, error) {
+	var val Value
 	kind := elem.Kind()
 	switch kind {
 	case reflect.String:
-		return &stringValue{elem}, nil
+		val = &stringValue{elem}
 	case reflect.Bool:
-		return &boolValue{elem}, nil
+		val = &boolValue{elem}
+		if def == "" {
+			def = "false"
+		}
 	case reflect.Float64:
-		return &boolValue{elem}, nil
+		val = &float64Value{elem}
 	case reflect.Int:
-		return &intValue{elem: elem, typeStr: "int"}, nil
+		val = &intValue{elem: elem, typeStr: "int"}
 	case reflect.Int64:
 		if tpack.RuntimeTypeID(elem.Type()) == timeDurationTypeID {
-			return &durationValue{elem}, nil
+			val = &durationValue{elem}
+		} else {
+			val = &intValue{elem: elem, typeStr: "int64"}
 		}
-		return &intValue{elem: elem, typeStr: "int64"}, nil
 	case reflect.Uint:
-		return &uintValue{elem: elem, typeStr: "uint"}, nil
+		val = &uintValue{elem: elem, typeStr: "uint"}
 	case reflect.Uint64:
-		return &uintValue{elem: elem, typeStr: "uint64"}, nil
+		val = &uintValue{elem: elem, typeStr: "uint64"}
+	default:
+		return nil, fmt.Errorf("flagx: not support field type %s", elem.Type().String())
 	}
-	return nil, fmt.Errorf("flagx: not support field type %s", elem.Type().String())
+	err := val.Set(def)
+	if err != nil {
+		return nil, errors.New("flagx: def=" + strings.TrimPrefix(err.Error(), "flagx: "))
+	}
+	return val, nil
 }
 
 type stringValue struct {
@@ -62,7 +75,7 @@ func (v *boolValue) String() string {
 
 func (v *boolValue) Set(val string) error {
 	if val == "" {
-		v.elem.SetBool(false)
+		v.elem.SetBool(true)
 		return nil
 	}
 	b, err := strconv.ParseBool(val)

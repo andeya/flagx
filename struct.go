@@ -1,7 +1,6 @@
 package flagx
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -10,29 +9,6 @@ import (
 	"github.com/henrylee2cn/goutil"
 	"github.com/henrylee2cn/goutil/tpack"
 )
-
-func parseTagKey(key, keyName string) (string, bool) {
-	v := strings.TrimPrefix(key, keyName+"=")
-	if v == key {
-		v = strings.TrimPrefix(key, keyName+" =")
-	}
-	if v == key {
-		return "", false
-	}
-	return strings.TrimSpace(v), true
-}
-
-func parseTagNames(key, def string) []string {
-	a := strings.Split(key, ",")
-	names := make([]string, 0, len(a))
-	for _, s := range a {
-		names = append(names, strings.TrimSpace(s))
-	}
-	if names[0] == "" {
-		names[0] = def
-	}
-	return names
-}
 
 var timeDurationTypeID = tpack.Unpack(time.Duration(0)).RuntimeTypeID()
 
@@ -78,7 +54,10 @@ func (f *FlagSet) varFromStruct(v reflect.Value) error {
 				usage = _usage
 				continue
 			}
-			names = parseTagNames(key, ft.Name)
+			names = parseTagNames(key)
+		}
+		if len(names) == 0 {
+			names = append(names, ft.Name)
 		}
 		for _, name := range names {
 			err := f.varReflectValue(fvElem, name, def, usage)
@@ -91,14 +70,33 @@ func (f *FlagSet) varFromStruct(v reflect.Value) error {
 }
 
 func (f *FlagSet) varReflectValue(elem reflect.Value, name, def, usage string) error {
-	val, err := newAnyValue(elem)
+	val, err := newAnyValue(elem, def)
 	if err != nil {
 		return err
 	}
-	err = val.Set(def)
-	if err != nil {
-		return errors.New("flagx: def=" + strings.TrimPrefix(err.Error(), "flagx: "))
-	}
 	f.FlagSet.Var(val, name, usage)
 	return nil
+}
+
+func parseTagKey(key, keyName string) (string, bool) {
+	v := strings.TrimPrefix(key, keyName+"=")
+	if v == key {
+		v = strings.TrimPrefix(key, keyName+" =")
+	}
+	if v == key {
+		return "", false
+	}
+	return strings.TrimSpace(v), true
+}
+
+func parseTagNames(key string) []string {
+	a := strings.Split(key, ",")
+	names := make([]string, 0, len(a))
+	for _, s := range a {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			names = append(names, s)
+		}
+	}
+	return names
 }

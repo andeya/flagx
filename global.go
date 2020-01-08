@@ -3,6 +3,7 @@ package flagx
 import (
 	"flag"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -194,7 +195,25 @@ func UintVar(p *uint, name string, value uint, usage string) {
 // If there are no back quotes, the name is an educated guess of the
 // type of the flag's value, or the empty string if the flag is boolean.
 func UnquoteUsage(f *Flag) (name string, usage string) {
-	return flag.UnquoteUsage(f)
+	name, usage = flag.UnquoteUsage(f)
+	if name != "value" || strings.Contains(f.Usage, "`"+name+"`") {
+		return
+	}
+	switch f.Value.(type) {
+	case *boolValue:
+		name = ""
+	case *durationValue:
+		name = "duration"
+	case *float64Value:
+		name = "float"
+	case *intValue:
+		name = "int"
+	case *stringValue:
+		name = "string"
+	case *uintValue:
+		name = "uint"
+	}
+	return
 }
 
 // Var defines a flag with the specified name and usage string. The type and
