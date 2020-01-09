@@ -101,4 +101,13 @@ func TestTidyArgs(t *testing.T) {
 		}
 		t.Logf("i:%d, tidiedArgs:%#v", i, tidiedArgs)
 	}
+	args := []string{"-run", "abc", "--", "-c", "2"}
+	tidiedArgs, args, err := tidyArgs(args, func(string) (want bool, next bool) { return true, true })
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"-run", "abc"}, tidiedArgs)
+	assert.Equal(t, []string{"-c", "2"}, args)
+	tidiedArgs, args, err = tidyArgs(args, func(string) (want bool, next bool) { return true, true })
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"-c", "2"}, tidiedArgs)
+	assert.Equal(t, []string{}, args)
 }
