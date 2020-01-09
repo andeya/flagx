@@ -8,7 +8,7 @@ import (
 )
 
 func TestLookupArgs(t *testing.T) {
-	var args = []string{"-run", "abc", "-t", "5s", "-Cool", "-N", "1"}
+	var args = []string{"-run", "abc", "-t", "5s", "-Cool", "-N=1", "-x"}
 
 	v, ok := LookupArgs(args, "run")
 	assert.True(t, ok)
@@ -25,6 +25,10 @@ func TestLookupArgs(t *testing.T) {
 	v, ok = LookupArgs(args, "N")
 	assert.True(t, ok)
 	assert.Equal(t, "1", v)
+
+	v, ok = LookupArgs(args, "x")
+	assert.True(t, ok)
+	assert.Equal(t, "", v)
 
 	v, ok = LookupArgs(args, "???")
 	assert.False(t, ok)

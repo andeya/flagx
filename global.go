@@ -10,14 +10,19 @@ import (
 // LookupArgs lookups the value corresponding to the name
 // directly from the arguments.
 func LookupArgs(arguments []string, name string) (value string, found bool) {
-	kv := filterArgs(arguments, []string{name})
-	switch len(kv) {
+	filteredArgs, _, _ := tidyArgs(arguments, func(key string) (want, next bool) {
+		if key == name {
+			return true, false
+		}
+		return false, true
+	})
+	switch len(filteredArgs) {
 	case 0:
 		return "", false
 	case 1:
 		return "", true
 	default:
-		return kv[1], true
+		return filteredArgs[1], true
 	}
 }
 

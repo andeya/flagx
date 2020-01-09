@@ -44,7 +44,7 @@ func ExampleStructVars() {
 	// {Run:^(TestStructVars)$ Timeout:30s V:true X:10}
 }
 
-func ExampleTestStructVars() {
+func ExampleMoreStructVars() {
 	type Args struct {
 		Run     string        `flag:"run; def=.*; usage=function name pattern"`
 		Timeout time.Duration `flag:"timeout,t"`
@@ -78,4 +78,25 @@ func ExampleTestStructVars() {
 	// {Run:abc Timeout:5s Cool:true View:true N:1}
 	// {Run: Timeout:0s Cool:false View:true N:0}
 	// {Run: Timeout:0s Cool:false View:true N:0}
+}
+
+func TestTidyArgs(t *testing.T) {
+	for i, a := range [][]string{
+		{}, // test default value
+		{"-run", "abc", "-timeout", "5s", "-Cool", "-N", "1"},
+		{"-run", "abc", "-t", "5s", "-Cool", "-N", "1"},
+		{"-run", "", "-t", "0", "-N", "0"},
+		{"-run", "", "-t", "0", "-x", "-N", "0", "-y", "z"},
+		{"-run", "", "m"},
+	} {
+		tidiedArgs, lastArgs, err := tidyArgs(a, func(string) (want bool, next bool) { return true, true })
+		assert.NoError(t, err)
+		switch i {
+		case 0, 1, 2, 3:
+			assert.Equal(t, []string{}, lastArgs)
+		case 5:
+			assert.Equal(t, []string{"m"}, lastArgs)
+		}
+		t.Logf("i:%d, tidiedArgs:%#v", i, tidiedArgs)
+	}
 }

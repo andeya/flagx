@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/henrylee2cn/goutil"
 )
@@ -73,6 +72,11 @@ func (f *FlagSet) Init(name string, errorHandling ErrorHandling) {
 	}
 }
 
+// ErrorHandling returns the error handling behavior of the flag set.
+func (f *FlagSet) ErrorHandling() ErrorHandling {
+	return f.errorHandling
+}
+
 // StructVars defines flags based on struct tags and binds to fields.
 // NOTE:
 //  Not support nested fields
@@ -97,43 +101,118 @@ func (f *FlagSet) Parse(arguments []string) error {
 		f.FlagSet.VisitAll(func(f *Flag) {
 			names = append(names, f.Name)
 		})
-		arguments = filterArgs(arguments, names)
+		var err error
+		arguments, _, err = filterArgs(arguments, names)
+		if err != nil {
+			return err
+		}
 	}
 	return f.FlagSet.Parse(arguments)
 }
 
-func filterArgs(args, names []string) []string {
-	a := make([]string, 0, len(names))
-L:
-	for _, name := range names {
-		for i := len(args) - 1; i >= 0; i-- {
-			if !strings.HasPrefix(args[i], "-") {
+func filterArgs(args, names []string) (filteredArgs, lastArgs []string, err error) {
+	if len(args) == 0 || len(names) == 0 {
+		lastArgs = args
+		return
+	}
+	names = goutil.StringsDistinct(names)
+	filteredArgs, lastArgs, err = tidyArgs(args, func(key string) (want, next bool) {
+		for i, name := range names {
+			if key != name {
 				continue
 			}
-			key := strings.TrimLeft(args[i], "-")
-			idx := strings.Index(key, "=")
-			if idx == -1 {
-				if key != name {
-					continue
-				}
-				if i+1 < len(args) {
-					val := args[i+1]
-					if !strings.HasPrefix(val, "-") {
-						a = append(a, "-"+name, val)
-						continue L
-					}
-				}
-				a = append(a, "-"+name)
-				continue L
+			names = append(names[:i], names[i+1:]...)
+			return true, len(names) > 0
+		}
+		return false, true
+	})
+	return
+}
+
+func tidyArgs(args []string, filter func(name string) (want, next bool)) (tidiedArgs, lastArgs []string, err error) {
+	lastArgs = args
+	tidiedArgs = make([]string, 0, len(args)*2)
+	var name string
+	var valuePtr *string
+	var seen bool
+	for {
+		lastArgs, name, valuePtr, seen, err = tidyOneArg(lastArgs)
+		if !seen {
+			return
+		}
+		want, next := filter(name)
+		if want {
+			var kv []string
+			if valuePtr == nil {
+				kv = []string{"-" + name}
+			} else {
+				kv = []string{"-" + name, *valuePtr}
 			}
-			if key[:idx] != name {
-				continue
-			}
-			a = append(a, "-"+name, key[idx+1:])
-			continue L
+			tidiedArgs = append(tidiedArgs, kv...)
+		}
+		if !next {
+			return
 		}
 	}
-	return a
+}
+
+// tidyOneArg tidies one flag. It reports whether a flag was seen.
+func tidyOneArg(args []string) (lastArgs []string, name string, valuePtr *string, seen bool, err error) {
+	if len(args) == 0 {
+		lastArgs = args
+		return
+	}
+	s := args[0]
+	if len(s) < 2 || s[0] != '-' {
+		lastArgs = args
+		return
+	}
+	numMinuses := 1
+	if s[1] == '-' {
+		numMinuses++
+		if len(s) == 2 { // "--" terminates the flags
+			lastArgs = args[1:]
+			return
+		}
+	}
+	name = s[numMinuses:]
+	if len(name) == 0 || name[0] == '-' || name[0] == '=' {
+		err = fmt.Errorf("bad flag syntax: %s", s)
+		lastArgs = args
+		return
+	}
+
+	// it's a flag.
+	seen = true
+	args = args[1:]
+
+	// does it have an argument?
+	for i := 1; i < len(name); i++ { // equals cannot be first
+		if name[i] == '=' {
+			value := name[i+1:]
+			valuePtr = &value
+			name = name[0:i]
+			lastArgs = args
+			return
+		}
+	}
+
+	// doesn't have an arg
+	if len(args) == 0 {
+		lastArgs = args
+		return
+	}
+
+	// value is the next arg
+	if maybeValue := args[0]; len(maybeValue) == 0 || maybeValue[0] != '-' {
+		valuePtr = &maybeValue
+		lastArgs = args[1:]
+		return
+	}
+
+	// doesn't have an arg
+	lastArgs = args
+	return
 }
 
 func cleanBit(eh, bit ErrorHandling) (ErrorHandling, bool) {
