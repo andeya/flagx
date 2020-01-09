@@ -97,36 +97,15 @@ func (f *FlagSet) StructVars(p interface{}) error {
 // The return value will be ErrHelp if -help or -h were set but not defined.
 func (f *FlagSet) Parse(arguments []string) error {
 	if f.isContinueOnUndefined {
-		names := make([]string, 0, len(arguments))
-		f.FlagSet.VisitAll(func(f *Flag) {
-			names = append(names, f.Name)
-		})
 		var err error
-		arguments, _, err = filterArgs(arguments, names)
+		arguments, _, err = tidyArgs(arguments, func(name string) (want, next bool) {
+			return f.FlagSet.Lookup(name) != nil, true
+		})
 		if err != nil {
 			return err
 		}
 	}
 	return f.FlagSet.Parse(arguments)
-}
-
-func filterArgs(args, names []string) (filteredArgs, lastArgs []string, err error) {
-	if len(args) == 0 || len(names) == 0 {
-		lastArgs = args
-		return
-	}
-	names = goutil.StringsDistinct(names)
-	filteredArgs, lastArgs, err = tidyArgs(args, func(key string) (want, next bool) {
-		for i, name := range names {
-			if key != name {
-				continue
-			}
-			names = append(names[:i], names[i+1:]...)
-			return true, len(names) > 0
-		}
-		return false, true
-	})
-	return
 }
 
 func tidyArgs(args []string, filter func(name string) (want, next bool)) (tidiedArgs, lastArgs []string, err error) {

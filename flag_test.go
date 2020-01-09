@@ -56,8 +56,9 @@ func ExampleMoreStructVars() {
 		{}, // test default value
 		{"-run", "abc", "-timeout", "5s", "-Cool", "-N", "1"},
 		{"-run", "abc", "-t", "5s", "-Cool", "-N", "1"},
-		{"-run", "", "-t", "0", "-N", "0"},                  // test zero value
-		{"-run", "", "-t", "0", "-x", "-N", "0", "-y", "z"}, // test zero value and ContinueOnUndefined
+		{"-run", "", "-t", "0", "-N", "0"},                            // test zero value
+		{"-run", "", "-t", "0", "-x", "-N", "10", "-y", "z"},          // test zero value and ContinueOnUndefined
+		{"-run", "", "-t", "0", "-x", "-N", "10", "-y", "z", "extra"}, // test extra and ContinueOnUndefined
 	} {
 		var args Args
 		fs := NewFlagSet(strconv.Itoa(i), ContinueOnError|ContinueOnUndefined)
@@ -77,7 +78,8 @@ func ExampleMoreStructVars() {
 	// {Run:abc Timeout:5s Cool:true View:true N:1}
 	// {Run:abc Timeout:5s Cool:true View:true N:1}
 	// {Run: Timeout:0s Cool:false View:true N:0}
-	// {Run: Timeout:0s Cool:false View:true N:0}
+	// {Run: Timeout:0s Cool:false View:true N:10}
+	// {Run: Timeout:0s Cool:false View:true N:10}
 }
 
 func TestTidyArgs(t *testing.T) {
