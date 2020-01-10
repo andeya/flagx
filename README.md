@@ -1,6 +1,6 @@
 # flagx [![report card](https://goreportcard.com/badge/github.com/henrylee2cn/flagx?style=flat-square)](http://goreportcard.com/report/henrylee2cn/flagx) [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/github.com/henrylee2cn/flagx)
 
-Standard flag package extension with more free usage.
+Standard flag package extension with more features, such as struct flag, app framework, etc.
 
 ## Extension Feature
 
@@ -16,6 +16,7 @@ Standard flag package extension with more free usage.
     - `float64`
     - `time.Duration`
 - Add `LookupArgs`: lookup the value corresponding to a name directly from arguments
+- Provide application framework
 - For more features, please open the issue
 
 ## Test Demo
@@ -91,5 +92,63 @@ func TestLookupArgs(t *testing.T) {
 	v, ok = LookupArgs(args, "???")
 	assert.False(t, ok)
 	assert.Equal(t, "", v)
+}
+```
+
+- Aapplication
+
+```go
+
+func ExampleApp() {
+	app := flagx.NewApp()
+	app.SetName("TestApp")
+	app.SetCmdName("testapp")
+	app.SetDescription("this is a app for testing")
+	app.SetAuthors([]flagx.Author{{
+		Name:  "henrylee2cn",
+		Email: "henrylee2cn@gmail.com",
+	}})
+	date, _ := time.Parse(time.RFC3339, "2020-01-10T15:17:03+08:00")
+	app.SetCompiled(date)
+	app.Use(Mw2)
+	app.SetOptions(new(GlobalHandler))
+	app.SetNotFound(func(c *flagx.Context) {
+		fmt.Printf("Not Found, args: %v", c.Args())
+	})
+	app.MustAddAction("a", "test-a", new(AHandler))
+	app.MustAddAction("c", "test-c", flagx.HandlerFunc(CHandler))
+
+	stat := app.Exec(context.TODO(), []string{"a", "-a", "x"})
+	if !stat.OK() {
+		panic(stat)
+	}
+
+	stat = app.Exec(context.TODO(), []string{"c"})
+	if !stat.OK() {
+		panic(stat)
+	}
+
+	stat = app.Exec(context.TODO(), []string{"-g", "g0", "--", "c"})
+	if !stat.OK() {
+		panic(stat)
+	}
+
+	stat = app.Exec(context.TODO(), []string{"b"})
+	if !stat.OK() {
+		panic(stat)
+	}
+
+	// Output:
+	// Mw2: start [a -a x]
+	// AHandler args:[a -a x]
+	// Mw2: end [a -a x]
+	// Mw2: start [c]
+	// CHandler args:[c]
+	// Mw2: end [c]
+	// Mw2: start [-g g0 -- c]
+	// GlobalHandler args:[-g g0 -- c]
+	// CHandler args:[-g g0 -- c]
+	// Mw2: end [-g g0 -- c]
+	// Not Found, args: [b]
 }
 ```
