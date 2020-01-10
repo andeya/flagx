@@ -85,7 +85,8 @@ func (f *FlagSet) StructVars(p interface{}) error {
 	if v.Kind() == reflect.Ptr {
 		v = goutil.DereferenceValue(v)
 		if v.Kind() == reflect.Struct {
-			return f.varFromStruct(v)
+			structTypeIDs := make(map[int32]struct{}, 4)
+			return f.varFromStruct(v, structTypeIDs)
 		}
 	}
 	return fmt.Errorf("flagx: want struct pointer parameter, but got %T", p)

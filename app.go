@@ -23,18 +23,19 @@ type (
 	// App is a application structure. It is recommended that
 	// an app be created with the flagx.NewApp() function
 	App struct {
-		appName     string
-		cmdName     string
-		description string
-		version     string
-		compiled    time.Time
-		authors     []Author
-		copyright   string
-		middlewares []Middleware
-		notFound    HandlerFunc
-		actions     map[string]*Action
-		usageText   string
-		lock        sync.RWMutex
+		appName       string
+		cmdName       string
+		description   string
+		version       string
+		compiled      time.Time
+		authors       []Author
+		copyright     string
+		middlewares   []Middleware
+		notFound      HandlerFunc
+		actions       map[string]*Action
+		sortedActions []*Action
+		usageText     string
+		lock          sync.RWMutex
 	}
 	// Author represents someone who has contributed to a cli project.
 	Author struct {
@@ -169,8 +170,9 @@ func (a *App) SetCompiled(date time.Time) {
 		info, err := os.Stat(os.Args[0])
 		if err != nil {
 			date = time.Now()
+		} else {
+			date = info.ModTime()
 		}
-		date = info.ModTime()
 	}
 	a.compiled = date
 	a.updateUsageLocked()
@@ -274,6 +276,13 @@ func (a *App) regAction(cmdName, desc string, handler Handler) error {
 	a.actions[cmdName] = action
 	a.updateUsageLocked()
 	return nil
+}
+
+// Actions returns the sorted list of all actions.
+func (a *App) Actions() []*Action {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	return a.sortedActions
 }
 
 // Exec executes application based on the arguments.
@@ -469,18 +478,23 @@ func (a *App) updateUsageLocked() {
 	}
 	if len(a.actions) > 0 {
 		nameList := make([]string, 0, len(a.actions))
+		a.sortedActions = make([]*Action, 0, len(a.actions))
 		for name := range a.actions {
 			nameList = append(nameList, name)
 		}
 		sort.Strings(nameList)
 		if nameList[0] == "" {
-			data["Options"] = a.actions[nameList[0]]
+			g := a.actions[nameList[0]]
+			data["Options"] = g
 			nameList = nameList[1:]
+			a.sortedActions = append(a.sortedActions, g)
 		}
 		if len(nameList) > 0 {
 			actions := make([]*Action, 0, len(nameList))
 			for _, name := range nameList {
-				actions = append(actions, a.actions[name])
+				g := a.actions[name]
+				actions = append(actions, g)
+				a.sortedActions = append(a.sortedActions, g)
 			}
 			data["Commands"] = actions
 		}

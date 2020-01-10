@@ -39,3 +39,4 @@ _testmain.go
 .DS_Store
 .idea/
 .vscode/
+vendor/*

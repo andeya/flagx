@@ -45,20 +45,24 @@ func ExampleStructVars() {
 }
 
 func ExampleMoreStructVars() {
+	type Anonymous struct {
+		F float64 `flag:"f"`
+	}
 	type Args struct {
 		Run     string        `flag:"run; def=.*; usage=function name pattern"`
 		Timeout time.Duration `flag:"timeout,t"`
 		Cool    bool          `flag:"usage=Cool experience"`
 		View    bool          `flag:"view,v; def=true"`
 		N       int           `flag:""`
+		Anonymous
 	}
 	for i, a := range [][]string{
 		{}, // test default value
-		{"-run", "abc", "-timeout", "5s", "-Cool", "-N", "1"},
-		{"-run", "abc", "-t", "5s", "-Cool", "-N", "1"},
-		{"-run", "", "-t", "0", "-N", "0"},                            // test zero value
-		{"-run", "", "-t", "0", "-x", "-N", "10", "-y", "z"},          // test zero value and ContinueOnUndefined
-		{"-run", "", "-t", "0", "-x", "-N", "10", "-y", "z", "extra"}, // test extra and ContinueOnUndefined
+		{"-run", "abc", "-timeout", "5s", "-Cool", "-N", "1", "-f=0.1"},
+		{"-run", "abc", "-t", "5s", "-Cool", "-N", "1", "-f=0.1"},
+		{"-run", "", "-t", "0", "-N", "0", "-f=0.1"},                            // test zero value
+		{"-run", "", "-t", "0", "-x", "-N", "10", "-y", "z", "-f=0.1"},          // test zero value and ContinueOnUndefined
+		{"-run", "", "-t", "0", "-x", "-N", "10", "-y", "z", "extra", "-f=0.1"}, // test extra and ContinueOnUndefined
 	} {
 		var args Args
 		fs := NewFlagSet(strconv.Itoa(i), ContinueOnError|ContinueOnUndefined)
@@ -74,12 +78,12 @@ func ExampleMoreStructVars() {
 		fs.Usage()
 	}
 	// Output:
-	// {Run:.* Timeout:0s Cool:false View:true N:0}
-	// {Run:abc Timeout:5s Cool:true View:true N:1}
-	// {Run:abc Timeout:5s Cool:true View:true N:1}
-	// {Run: Timeout:0s Cool:false View:true N:0}
-	// {Run: Timeout:0s Cool:false View:true N:10}
-	// {Run: Timeout:0s Cool:false View:true N:10}
+	// {Run:.* Timeout:0s Cool:false View:true N:0 Anonymous:{F:0}}
+	// {Run:abc Timeout:5s Cool:true View:true N:1 Anonymous:{F:0.1}}
+	// {Run:abc Timeout:5s Cool:true View:true N:1 Anonymous:{F:0.1}}
+	// {Run: Timeout:0s Cool:false View:true N:0 Anonymous:{F:0.1}}
+	// {Run: Timeout:0s Cool:false View:true N:10 Anonymous:{F:0.1}}
+	// {Run: Timeout:0s Cool:false View:true N:10 Anonymous:{F:0}}
 }
 
 func TestTidyArgs(t *testing.T) {

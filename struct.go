@@ -21,12 +21,17 @@ const (
 
 var timeDurationTypeID = tpack.Unpack(time.Duration(0)).RuntimeTypeID()
 
-func (f *FlagSet) varFromStruct(v reflect.Value) error {
+func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[int32]struct{}) error {
 	v = goutil.DereferenceValue(v)
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("flagx: want struct pointer field, but got %s", v.Type().String())
 	}
 	t := v.Type()
+	tid := tpack.RuntimeTypeID(t)
+	if _, ok := structTypeIDs[tid]; ok {
+		return nil
+	}
+	structTypeIDs[tid] = struct{}{}
 	for i := t.NumField() - 1; i >= 0; i-- {
 		fv := v.Field(i)
 		if !fv.CanSet() {
@@ -34,20 +39,35 @@ func (f *FlagSet) varFromStruct(v reflect.Value) error {
 		}
 		ft := t.Field(i)
 		tag, ok := ft.Tag.Lookup(tagNameFlag)
-		if !ok || tag == tagKeyOmit {
+		if tag == tagKeyOmit {
 			continue
 		}
-		ftElem := goutil.DereferenceType(ft.Type)
-		switch ftElem.Kind() {
+		if !goutil.InitPointer(fv) {
+			return fmt.Errorf("flagx: can not set field %s, type=%s", ft.Name, ft.Type.String())
+		}
+		fvElem := goutil.DereferenceValue(fv)
+		kind := fvElem.Kind()
+		switch kind {
 		case reflect.String,
 			reflect.Bool,
 			reflect.Float64,
 			reflect.Int, reflect.Int64,
 			reflect.Uint, reflect.Uint64:
+			if !ok {
+				continue
+			}
+
 		default:
-			return fmt.Errorf("flagx: not support field type %s", ft.Type.String())
+			if !ok && kind == reflect.Struct && ft.Anonymous {
+				err := f.varFromStruct(goutil.DereferenceValue(fv), structTypeIDs)
+				if err != nil {
+					return err
+				}
+				continue
+			} else {
+				return fmt.Errorf("flagx: not support field %s, type=%s", ft.Name, ft.Type.String())
+			}
 		}
-		fvElem := goutil.DereferenceValue(fv)
 		keys := strings.SplitN(tag, ";", 3)
 		var def, usage string
 		var names []string
