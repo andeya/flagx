@@ -21,7 +21,7 @@ Standard flag package extension with more features, such as struct flag, app fra
 
 ## Test Demo
 
-- ignore provided but undefined flags
+- Ignore provided but undefined flags
 
 ```go
 func TestContinueOnUndefined(t *testing.T) {
@@ -40,7 +40,7 @@ func TestContinueOnUndefined(t *testing.T) {
 }
 ```
 
-- define flags based on struct tags and bind to fields
+- Define flags based on struct tags and bind to fields
 
 ```go
 func ExampleStructVars() {
@@ -63,7 +63,7 @@ func ExampleStructVars() {
 }
 ```
 
-- lookup the value corresponding to a name directly from arguments
+- Lookup the value corresponding to a name directly from arguments
 
 ```go
 func TestLookupArgs(t *testing.T) {
