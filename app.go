@@ -62,7 +62,7 @@ type (
 	// Context context of an action execution
 	Context struct {
 		context.Context
-		args []string
+		argsGroup map[string][]string
 	}
 )
 
@@ -288,31 +288,28 @@ func (a *App) Actions() []*Action {
 // Exec executes application based on the arguments.
 func (a *App) Exec(ctx context.Context, arguments []string) (stat *status.Status) {
 	defer status.Catch(&stat)
-	handle := a.route(arguments)
-	handle(&Context{args: arguments, Context: ctx})
+	handle, ctxObj := a.route(ctx, arguments)
+	handle(ctxObj)
 	return nil
 }
 
-func (a *App) route(arguments []string) HandlerFunc {
+func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Context) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	argsGroup, err := pickCommandAndArguments(arguments)
 	status.Check(err, 1, "")
+	ctxObj := &Context{argsGroup: argsGroup, Context: ctx}
 	var actions = make([]*Action, 0, 2)
-	for _, g := range argsGroup {
-		if len(g) == 0 {
-			continue
-		}
-		subcommand := g[0]
-		action := a.actions[subcommand]
+	for cmdName := range argsGroup {
+		action := a.actions[cmdName]
 		if action == nil {
 			if a.notFound != nil {
-				return a.notFound
+				return a.notFound, ctxObj
 			}
-			if subcommand == "" {
+			if cmdName == "" {
 				status.Throw(1, "not support global flags", nil)
 			}
-			status.Throw(2, fmt.Sprintf("subcommand %q is not defined", subcommand), nil)
+			status.Throw(2, fmt.Sprintf("subcommand %q is not defined", cmdName), nil)
 		}
 		actions = append(actions, action)
 	}
@@ -328,7 +325,7 @@ func (a *App) route(arguments []string) HandlerFunc {
 			middleware(c, nextHandle)
 		}
 	}
-	return handlerFunc
+	return handlerFunc, ctxObj
 }
 
 // UsageText returns the usage text.
@@ -386,20 +383,31 @@ func (a *Action) Description() string {
 	return a.description
 }
 
-func (a *Action) exec(c *Context) {
-	flagSet := NewFlagSet(a.flagSet.Name(), a.flagSet.ErrorHandling())
+func (a *Action) exec(c *Context) error {
 	if a.handlerFunc != nil {
 		a.handlerFunc(c)
 	} else {
+		cmdName := a.flagSet.Name()
+		flagSet := NewFlagSet(cmdName, a.flagSet.ErrorHandling())
 		newObj := reflect.New(a.handlerElemType).Interface()
 		flagSet.StructVars(newObj)
+		err := flagSet.Parse(c.argsGroup[cmdName])
+		if err != nil {
+			return err
+		}
 		newObj.(Handler).Handle(c)
 	}
+	return nil
 }
 
 // Args returns the arguments.
-func (c *Context) Args() []string {
-	return c.args
+func (c *Context) Args() map[string][]string {
+	return c.argsGroup
+}
+
+// LookupArgs lookups the value corresponding to the name.
+func (c *Context) LookupArgs(cmdName, name string) (string, bool) {
+	return LookupArgs(c.argsGroup[cmdName], name)
 }
 
 // String makes Author comply to the Stringer interface, to allow an easy print in the templating process
@@ -411,13 +419,14 @@ func (a Author) String() string {
 	return fmt.Sprintf("%v%v", a.Name, e)
 }
 
-func pickCommandAndArguments(arguments []string) (r [2][]string, err error) {
+func pickCommandAndArguments(arguments []string) (r map[string][]string, err error) {
 	cmd, args := pickCommand(arguments)
 	tidiedArgs, args, err := tidyArgs(args, func(string) (want bool, next bool) { return true, true })
 	if err != nil {
 		return
 	}
-	r[0] = append([]string{cmd}, tidiedArgs...)
+	r = make(map[string][]string, 2)
+	r[cmd] = tidiedArgs
 	if len(args) == 0 {
 		return
 	}
@@ -429,7 +438,7 @@ func pickCommandAndArguments(arguments []string) (r [2][]string, err error) {
 	if err != nil {
 		return
 	}
-	r[1] = append([]string{cmd}, tidiedArgs...)
+	r[cmd] = tidiedArgs
 	return
 }
 

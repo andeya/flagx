@@ -98,7 +98,6 @@ func TestLookupArgs(t *testing.T) {
 - Aapplication
 
 ```go
-
 func ExampleApp() {
 	app := flagx.NewApp()
 	app.SetName("TestApp")
@@ -139,16 +138,46 @@ func ExampleApp() {
 	}
 
 	// Output:
-	// Mw2: start [a -a x]
-	// AHandler args:[a -a x]
-	// Mw2: end [a -a x]
-	// Mw2: start [c]
-	// CHandler args:[c]
-	// Mw2: end [c]
-	// Mw2: start [-g g0 -- c]
-	// GlobalHandler args:[-g g0 -- c]
-	// CHandler args:[-g g0 -- c]
-	// Mw2: end [-g g0 -- c]
-	// Not Found, args: [b]
+	// Mw2: start map[a:[-a x]]
+	// AHandler args=map[a:[-a x]], -a=x
+	// Mw2: end map[a:[-a x]]
+	// Mw2: start map[c:[]]
+	// CHandler args:map[c:[]]
+	// Mw2: end map[c:[]]
+	// Mw2: start map[:[-g g0] c:[]]
+	// GlobalHandler args=map[:[-g g0] c:[]], -g=g0
+	// CHandler args:map[:[-g g0] c:[]]
+	// Mw2: end map[:[-g g0] c:[]]
+	// Not Found, args: map[b:[]]
+}
+
+
+func Mw2(c *flagx.Context, next func(*flagx.Context)) error {
+	fmt.Printf("Mw2: start %v\n", c.Args())
+	defer func() {
+		fmt.Printf("Mw2: end %v\n", c.Args())
+	}()
+	next(c)
+	return nil
+}
+
+type GlobalHandler struct {
+	G string `flag:"g;usage=GlobalHandler"`
+}
+
+func (g *GlobalHandler) Handle(c *flagx.Context) {
+	fmt.Printf("GlobalHandler args=%+v, -g=%s\n", c.Args(), g.G)
+}
+
+type AHandler struct {
+	A string `flag:"a;usage=AHandler"`
+}
+
+func (a *AHandler) Handle(c *flagx.Context) {
+	fmt.Printf("AHandler args=%+v, -a=%s\n", c.Args(), a.A)
+}
+
+func CHandler(c *flagx.Context) {
+	fmt.Printf("CHandler args:%+v\n", c.Args())
 }
 ```
