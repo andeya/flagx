@@ -405,10 +405,10 @@ func (c *Context) Args() map[string][]string {
 	return c.argsGroup
 }
 
-// LookupArgs lookups the value corresponding to the name.
-func (c *Context) LookupArgs(cmdName, name string) (string, bool) {
-	return LookupArgs(c.argsGroup[cmdName], name)
-}
+// // LookupArgs lookups the value corresponding to the name.
+// func (c *Context) LookupArgs(cmdName, name string) (string, bool) {
+// 	return LookupArgs(c.argsGroup[cmdName], name)
+// }
 
 // String makes Author comply to the Stringer interface, to allow an easy print in the templating process
 func (a Author) String() string {
