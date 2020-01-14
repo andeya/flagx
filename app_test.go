@@ -24,7 +24,11 @@ func ExampleApp() {
 	app.Use(Mw2)
 	app.SetOptions(new(GlobalHandler))
 	app.SetNotFound(func(c *flagx.Context) {
-		fmt.Printf("Not Found, args: %v", c.Args())
+		cmdName, options := c.Args()
+		fmt.Printf(
+			"Not Found, args: cmd=%q, options=%v\n",
+			cmdName, options,
+		)
 	})
 	app.MustAddAction("a", "test-a", new(AHandler))
 	app.MustAddAction("c", "test-c", flagx.HandlerFunc(CHandler))
@@ -44,23 +48,25 @@ func ExampleApp() {
 		panic(stat)
 	}
 
-	stat = app.Exec(context.TODO(), []string{"b"})
+	stat = app.Exec(context.TODO(), []string{"b", "-no"})
 	if !stat.OK() {
 		panic(stat)
 	}
 
 	// Output:
-	// Mw2: start map[a:[-a x]]
-	// AHandler args=map[a:[-a x]], -a=x
-	// Mw2: end map[a:[-a x]]
-	// Mw2: start map[c:[]]
-	// CHandler args:map[c:[]]
-	// Mw2: end map[c:[]]
-	// Mw2: start map[:[-g g0] c:[]]
-	// GlobalHandler args=map[:[-g g0] c:[]], -g=g0
-	// CHandler args:map[:[-g g0] c:[]]
-	// Mw2: end map[:[-g g0] c:[]]
-	// Not Found, args: map[b:[]]
+	// Mw2: cmd="", options=[] start
+	// AHandler cmd="a", options=[-a x], -a=x
+	// Mw2: cmd="", options=[] end
+	// Mw2: cmd="", options=[] start
+	// CHandler cmd="c", options=[]
+	// Mw2: cmd="", options=[] end
+	// Mw2: cmd="", options=[-g g0] start
+	// GlobalHandler cmd="", options=[-g g0], -g=g0
+	// CHandler cmd="c", options=[]
+	// Mw2: cmd="", options=[-g g0] end
+	// Mw2: cmd="", options=[] start
+	// Not Found, args: cmd="b", options=[-no]
+	// Mw2: cmd="", options=[] end
 }
 
 func TestApp(t *testing.T) {
@@ -109,18 +115,32 @@ func TestApp(t *testing.T) {
 
 func Mw1(c *flagx.Context, next func(*flagx.Context)) error {
 	t := time.Now()
-	fmt.Printf("Mw1: %+v, start at:%v\n", c.Args(), t)
+	cmdName, options := c.Args()
+	fmt.Printf(
+		"Mw1: cmd=%q, options=%v, start at=%v\n",
+		cmdName, options, t,
+	)
 	defer func() {
-		fmt.Printf("Mw1: %+v, cost time:%s\n", c.Args(), time.Since(t))
+		fmt.Printf(
+			"Mw1: cmd=%q, options=%v, cost time=%v\n",
+			cmdName, options, time.Since(t),
+		)
 	}()
 	next(c)
 	return nil
 }
 
 func Mw2(c *flagx.Context, next func(*flagx.Context)) error {
-	fmt.Printf("Mw2: start %v\n", c.Args())
+	cmdName, options := c.Args()
+	fmt.Printf(
+		"Mw2: cmd=%q, options=%v start\n",
+		cmdName, options,
+	)
 	defer func() {
-		fmt.Printf("Mw2: end %v\n", c.Args())
+		fmt.Printf(
+			"Mw2: cmd=%q, options=%v end\n",
+			cmdName, options,
+		)
 	}()
 	next(c)
 	return nil
@@ -131,7 +151,8 @@ type GlobalHandler struct {
 }
 
 func (g *GlobalHandler) Handle(c *flagx.Context) {
-	fmt.Printf("GlobalHandler args=%+v, -g=%s\n", c.Args(), g.G)
+	cmdName, options := c.Args()
+	fmt.Printf("GlobalHandler cmd=%q, options=%v, -g=%s\n", cmdName, options, g.G)
 }
 
 type AHandler struct {
@@ -139,7 +160,8 @@ type AHandler struct {
 }
 
 func (a *AHandler) Handle(c *flagx.Context) {
-	fmt.Printf("AHandler args=%+v, -a=%s\n", c.Args(), a.A)
+	cmdName, options := c.Args()
+	fmt.Printf("AHandler cmd=%q, options=%v, -a=%s\n", cmdName, options, a.A)
 }
 
 type BHandler struct {
@@ -147,9 +169,11 @@ type BHandler struct {
 }
 
 func (b *BHandler) Handle(c *flagx.Context) {
-	fmt.Printf("BHandler args=%+v, -b=%s\n", c.Args(), b.B)
+	cmdName, options := c.Args()
+	fmt.Printf("BHandler cmd=%q, options=%v, -b=%s\n", cmdName, options, b.B)
 }
 
 func CHandler(c *flagx.Context) {
-	fmt.Printf("CHandler args:%+v\n", c.Args())
+	cmdName, options := c.Args()
+	fmt.Printf("CHandler cmd=%q, options=%v\n", cmdName, options)
 }

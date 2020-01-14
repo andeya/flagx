@@ -64,6 +64,11 @@ type (
 		context.Context
 		argsGroup map[string][]string
 	}
+	contextKey int8
+)
+
+const (
+	currCmdName contextKey = iota
 )
 
 // NewApp creates a new application.
@@ -298,13 +303,19 @@ func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Cont
 	defer a.lock.RUnlock()
 	argsGroup, err := pickCommandAndArguments(arguments)
 	status.Check(err, 1, "")
-	ctxObj := &Context{argsGroup: argsGroup, Context: ctx}
+	var ctxObj = &Context{argsGroup: argsGroup, Context: ctx}
 	var actions = make([]*Action, 0, 2)
+	var handlerFunc func(c *Context)
+
 	for cmdName := range argsGroup {
 		action := a.actions[cmdName]
 		if action == nil {
 			if a.notFound != nil {
-				return a.notFound, ctxObj
+				// middleware is still executed
+				handlerFunc = func(c *Context) {
+					a.notFound(c.new(cmdName))
+				}
+				break
 			}
 			if cmdName == "" {
 				status.Throw(1, "not support global flags", nil)
@@ -313,9 +324,11 @@ func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Cont
 		}
 		actions = append(actions, action)
 	}
-	handlerFunc := func(c *Context) {
-		for _, action := range actions {
-			action.exec(c)
+	if handlerFunc == nil {
+		handlerFunc = func(c *Context) {
+			for _, action := range actions {
+				action.handle(c)
+			}
 		}
 	}
 	for i := len(a.middlewares) - 1; i >= 0; i-- {
@@ -383,11 +396,18 @@ func (a *Action) Description() string {
 	return a.description
 }
 
-func (a *Action) exec(c *Context) error {
+// Exec executes the action alone.
+func (a *Action) Exec(c context.Context, options []string) error {
+	cmdName := a.flagSet.Name()
+	return a.handle(newContext(c, cmdName, map[string][]string{cmdName: options}))
+}
+
+func (a *Action) handle(c *Context) error {
+	cmdName := a.flagSet.Name()
+	c = c.new(cmdName)
 	if a.handlerFunc != nil {
 		a.handlerFunc(c)
 	} else {
-		cmdName := a.flagSet.Name()
 		flagSet := NewFlagSet(cmdName, a.flagSet.ErrorHandling())
 		newObj := reflect.New(a.handlerElemType).Interface()
 		flagSet.StructVars(newObj)
@@ -400,15 +420,33 @@ func (a *Action) exec(c *Context) error {
 	return nil
 }
 
-// Args returns the arguments.
-func (c *Context) Args() map[string][]string {
-	return c.argsGroup
+func newContext(ctx context.Context, cmdName string, argsGroup map[string][]string) *Context {
+	return &Context{
+		Context:   context.WithValue(ctx, currCmdName, cmdName),
+		argsGroup: argsGroup,
+	}
 }
 
-// // LookupArgs lookups the value corresponding to the name.
-// func (c *Context) LookupArgs(cmdName, name string) (string, bool) {
-// 	return LookupArgs(c.argsGroup[cmdName], name)
-// }
+func (c *Context) new(cmdName string) *Context {
+	return newContext(c.Context, cmdName, c.argsGroup)
+}
+
+// CmdName returns the command name.
+// NOTE:
+//  global command name is ""
+func (c *Context) CmdName() string {
+	cmdName, _ := c.Context.Value(currCmdName).(string)
+	return cmdName
+}
+
+// Args returns the current command and options.
+// NOTE:
+//  global command name is ""
+func (c *Context) Args() (cmdName string, options []string) {
+	cmdName = c.CmdName()
+	options = c.argsGroup[cmdName]
+	return cmdName, options
+}
 
 // String makes Author comply to the Stringer interface, to allow an easy print in the templating process
 func (a Author) String() string {
