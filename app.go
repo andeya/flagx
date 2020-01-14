@@ -23,20 +23,23 @@ type (
 	// App is a application structure. It is recommended that
 	// an app be created with the flagx.NewApp() function
 	App struct {
-		appName       string
-		cmdName       string
-		description   string
-		version       string
-		compiled      time.Time
-		authors       []Author
-		copyright     string
-		middlewares   []Middleware
-		notFound      HandlerFunc
-		actions       map[string]*Action
-		sortedActions []*Action
-		usageText     string
-		lock          sync.RWMutex
+		appName          string
+		cmdName          string
+		description      string
+		version          string
+		compiled         time.Time
+		authors          []Author
+		copyright        string
+		middlewares      []Middleware
+		notFound         HandlerFunc
+		actions          map[string]*Action
+		sortedActions    []*Action
+		usageText        string
+		defaultValidator ValidateFunc
+		lock             sync.RWMutex
 	}
+	// ValidateFunc validator for struct flag
+	ValidateFunc func(interface{}) error
 	// Author represents someone who has contributed to a cli project.
 	Author struct {
 		Name  string // The Authors name
@@ -50,6 +53,7 @@ type (
 		usageText       string
 		handlerElemType reflect.Type
 		handlerFunc     HandlerFunc
+		validateFunc    func(interface{}) error
 	}
 	// Handler handler of action
 	Handler interface {
@@ -236,8 +240,8 @@ func (a *App) MustSetOptions(handler Handler) {
 // SetOptions sets the global options.
 // NOTE:
 //  Panic when something goes wrong.
-func (a *App) SetOptions(handler Handler) error {
-	return a.regAction("", "", handler)
+func (a *App) SetOptions(handler Handler, validator ...ValidateFunc) error {
+	return a.regAction("", "", handler, validator)
 }
 
 // SetNotFound sets the handler when the correct command cannot be found.
@@ -247,31 +251,39 @@ func (a *App) SetNotFound(fn HandlerFunc) {
 	a.notFound = fn
 }
 
+// SetDefaultValidator sets the default validator of struct flag.
+func (a *App) SetDefaultValidator(fn ValidateFunc) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.defaultValidator = fn
+}
+
 // MustAddAction adds an action.
 // NOTE:
 //  Panic when something goes wrong.
-func (a *App) MustAddAction(cmdName, desc string, handler Handler) {
-	err := a.AddAction(cmdName, desc, handler)
+func (a *App) MustAddAction(cmdName, desc string, handler Handler, validator ...ValidateFunc) {
+	err := a.AddAction(cmdName, desc, handler, validator...)
 	if err != nil {
 		panic(err)
 	}
 }
 
 // AddAction adds an action.
-func (a *App) AddAction(cmdName, desc string, handler Handler) error {
+func (a *App) AddAction(cmdName, desc string, handler Handler, validator ...ValidateFunc) error {
 	if cmdName == "" {
 		return errors.New("action name can not be empty")
 	}
-	return a.regAction(cmdName, desc, handler)
+	return a.regAction(cmdName, desc, handler, validator)
 }
 
-func (a *App) regAction(cmdName, desc string, handler Handler) error {
+func (a *App) regAction(cmdName, desc string, handler Handler, validator []ValidateFunc) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if a.actions[cmdName] != nil {
 		return fmt.Errorf("an action named %s already exists", cmdName)
 	}
-	action, err := newAction(cmdName, desc, handler)
+
+	action, err := newAction(cmdName, desc, handler, append(validator, a.defaultValidator)[0])
 	if err != nil {
 		return err
 	}
@@ -351,9 +363,9 @@ func (a *App) UsageText() string {
 	return a.usageText
 }
 
-func newAction(cmdName, desc string, handler Handler) (*Action, error) {
+func newAction(cmdName, desc string, handler Handler, validateFunc func(interface{}) error) (*Action, error) {
 	var action Action
-
+	action.validateFunc = validateFunc
 	action.description = desc
 	action.flagSet = NewFlagSet(cmdName, ContinueOnError|ContinueOnUndefined)
 	action.handlerElemType = goutil.DereferenceType(reflect.TypeOf(handler))
@@ -412,6 +424,9 @@ func (a *Action) handle(c *Context) error {
 		newObj := reflect.New(a.handlerElemType).Interface()
 		flagSet.StructVars(newObj)
 		err := flagSet.Parse(c.argsGroup[cmdName])
+		if err == nil && a.validateFunc != nil {
+			err = a.validateFunc(newObj)
+		}
 		if err != nil {
 			return err
 		}
