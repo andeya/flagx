@@ -175,7 +175,7 @@ func (a *App) CmdName() string {
 
 // SetCmdName sets the command name of the application.
 // NOTE:
-//  Remove - prefix automatically
+//  remove '-' prefix automatically
 func (a *App) SetCmdName(cmdName string) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -306,6 +306,9 @@ func (fn HandlerFunc) Handle(c *Context) {
 }
 
 // MustSetOptions sets the global options actions.
+// NOTE:
+//  panic when something goes wrong;
+//  if handler is a struct, it can implement the copier interface.
 func (a *App) MustSetOptions(handler Handler) {
 	err := a.SetOptions(handler)
 	if err != nil {
@@ -315,35 +318,15 @@ func (a *App) MustSetOptions(handler Handler) {
 
 // SetOptions sets the global options.
 // NOTE:
-//  Panic when something goes wrong.
+//  if handler is a struct, it can implement the copier interface.
 func (a *App) SetOptions(handler Handler, validator ...ValidateFunc) error {
 	return a.regAction("", "", handler, validator)
 }
 
-// SetNotFound sets the handler when the correct command cannot be found.
-func (a *App) SetNotFound(fn HandlerFunc) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	a.notFound = fn
-}
-
-// SetDefaultValidator sets the default validator of struct flag.
-func (a *App) SetDefaultValidator(fn ValidateFunc) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	a.defaultValidator = fn
-}
-
-// SetUsageTemplate sets usage template.
-func (a *App) SetUsageTemplate(tmpl *template.Template) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	a.usageTemplate = tmpl
-}
-
 // MustAddAction adds an action.
 // NOTE:
-//  Panic when something goes wrong.
+//  panic when something goes wrong;
+//  if handler is a struct, it can implement the copier interface.
 func (a *App) MustAddAction(cmdName, desc string, handler Handler, validator ...ValidateFunc) {
 	err := a.AddAction(cmdName, desc, handler, validator...)
 	if err != nil {
@@ -352,6 +335,8 @@ func (a *App) MustAddAction(cmdName, desc string, handler Handler, validator ...
 }
 
 // AddAction adds an action.
+// NOTE:
+//  if handler is a struct, it can implement the copier interface.
 func (a *App) AddAction(cmdName, desc string, handler Handler, validator ...ValidateFunc) error {
 	if cmdName == "" {
 		return errors.New("action name can not be empty")
@@ -383,6 +368,27 @@ func (a *App) Actions() []*Action {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	return a.sortedActions
+}
+
+// SetNotFound sets the handler when the correct command cannot be found.
+func (a *App) SetNotFound(fn HandlerFunc) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.notFound = fn
+}
+
+// SetDefaultValidator sets the default validator of struct flag.
+func (a *App) SetDefaultValidator(fn ValidateFunc) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.defaultValidator = fn
+}
+
+// SetUsageTemplate sets usage template.
+func (a *App) SetUsageTemplate(tmpl *template.Template) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.usageTemplate = tmpl
 }
 
 // Exec executes application based on the arguments.
