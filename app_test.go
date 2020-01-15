@@ -24,10 +24,10 @@ func ExampleApp() {
 	app.Use(Mw2)
 	app.SetOptions(new(GlobalHandler))
 	app.SetNotFound(func(c *flagx.Context) {
-		cmdName, options := c.Args()
+		argsInfo := c.ArgsInfo()
 		fmt.Printf(
 			"Not Found, args: cmd=%q, options=%v\n",
-			cmdName, options,
+			argsInfo.Command, argsInfo.Options,
 		)
 	})
 	app.MustAddAction("a", "test-a", new(AHandler))
@@ -115,30 +115,30 @@ func TestApp(t *testing.T) {
 
 func Mw1(c *flagx.Context, next flagx.HandlerFunc) {
 	t := time.Now()
-	cmdName, options := c.Args()
+	argsInfo := c.ArgsInfo()
 	fmt.Printf(
 		"Mw1: cmd=%q, options=%v, start at=%v\n",
-		cmdName, options, t,
+		argsInfo.Command, argsInfo.Options, t,
 	)
 	defer func() {
 		fmt.Printf(
 			"Mw1: cmd=%q, options=%v, cost time=%v\n",
-			cmdName, options, time.Since(t),
+			argsInfo.Command, argsInfo.Options, time.Since(t),
 		)
 	}()
 	next(c)
 }
 
 func Mw2(c *flagx.Context, next flagx.HandlerFunc) {
-	cmdName, options := c.Args()
+	argsInfo := c.ArgsInfo()
 	fmt.Printf(
 		"Mw2: cmd=%q, options=%v start\n",
-		cmdName, options,
+		argsInfo.Command, argsInfo.Options,
 	)
 	defer func() {
 		fmt.Printf(
 			"Mw2: cmd=%q, options=%v end\n",
-			cmdName, options,
+			argsInfo.Command, argsInfo.Options,
 		)
 	}()
 	next(c)
@@ -149,8 +149,8 @@ type GlobalHandler struct {
 }
 
 func (g *GlobalHandler) Handle(c *flagx.Context) {
-	cmdName, options := c.Args()
-	fmt.Printf("GlobalHandler cmd=%q, options=%v, -g=%s\n", cmdName, options, g.G)
+	argsInfo := c.ArgsInfo()
+	fmt.Printf("GlobalHandler cmd=%q, options=%v, -g=%s\n", argsInfo.Command, argsInfo.Options, g.G)
 }
 
 type AHandler struct {
@@ -158,8 +158,8 @@ type AHandler struct {
 }
 
 func (a *AHandler) Handle(c *flagx.Context) {
-	cmdName, options := c.Args()
-	fmt.Printf("AHandler cmd=%q, options=%v, -a=%s\n", cmdName, options, a.A)
+	argsInfo := c.ArgsInfo()
+	fmt.Printf("AHandler cmd=%q, options=%v, -a=%s\n", argsInfo.Command, argsInfo.Options, a.A)
 }
 
 type BHandler struct {
@@ -167,11 +167,11 @@ type BHandler struct {
 }
 
 func (b *BHandler) Handle(c *flagx.Context) {
-	cmdName, options := c.Args()
-	fmt.Printf("BHandler cmd=%q, options=%v, -b=%s\n", cmdName, options, b.B)
+	argsInfo := c.ArgsInfo()
+	fmt.Printf("BHandler cmd=%q, options=%v, -b=%s\n", argsInfo.Command, argsInfo.Options, b.B)
 }
 
 func CHandler(c *flagx.Context) {
-	cmdName, options := c.Args()
-	fmt.Printf("CHandler cmd=%q, options=%v\n", cmdName, options)
+	argsInfo := c.ArgsInfo()
+	fmt.Printf("CHandler cmd=%q, options=%v\n", argsInfo.Command, argsInfo.Options)
 }

@@ -48,13 +48,13 @@ type (
 	}
 	// Action a command action
 	Action struct {
-		flagSet         *FlagSet
-		description     string
-		usageBody       string
-		usageText       string
-		handlerElemType reflect.Type
-		handlerFunc     HandlerFunc
-		validateFunc    func(interface{}) error
+		flagSet        *FlagSet
+		description    string
+		usageBody      string
+		usageText      string
+		handlerFactory DeepCopier
+		handlerFunc    HandlerFunc
+		validateFunc   func(interface{}) error
 	}
 	// Handler handler of action
 	Handler interface {
@@ -62,6 +62,10 @@ type (
 		// NOTE:
 		//  If need to return an error, use *Context.ThrowStatus or *Context.CheckStatus
 		Handle(*Context)
+	}
+	// DeepCopier an interface that can create its own copy
+	DeepCopier interface {
+		DeepCopy() Handler
 	}
 	// HandlerFunc handler function
 	// NOTE:
@@ -74,11 +78,20 @@ type (
 	// Context context of an action execution
 	Context struct {
 		context.Context
-		argsGroup map[string][]string
+		argsGroup []*ArgsInfo
+	}
+	// ArgsInfo command and options
+	ArgsInfo struct {
+		Command string
+		Options []string
 	}
 	// Status a handling status with code, msg, cause and stack.
 	Status     = status.Status
 	contextKey int8
+
+	handlerFactory struct {
+		elemType reflect.Type
+	}
 )
 
 // Status code
@@ -383,13 +396,14 @@ func (a *App) Exec(ctx context.Context, arguments []string) (stat *Status) {
 func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Context) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	argsGroup, err := pickCommandAndOptions(arguments)
+	argsGroup, err := pickArgsInfo(arguments)
 	status.Check(err, StatusBadArgs, "bad arguments")
 	var ctxObj = &Context{argsGroup: argsGroup, Context: ctx}
 	var actions = make([]*Action, 0, 2)
 	var handlerFunc func(c *Context)
 
-	for cmdName := range argsGroup {
+	for _, argsInfo := range argsGroup {
+		cmdName := argsInfo.Command
 		action := a.actions[cmdName]
 		if action == nil {
 			if a.notFound != nil {
@@ -433,16 +447,25 @@ func (a *App) UsageText() string {
 	return a.usageText
 }
 
+func (h *handlerFactory) DeepCopy() Handler {
+	return reflect.New(h.elemType).Interface().(Handler)
+}
+
 func newAction(cmdName, desc string, handler Handler, validateFunc func(interface{}) error) (*Action, error) {
 	var action Action
 	action.validateFunc = validateFunc
 	action.description = desc
 	action.flagSet = NewFlagSet(cmdName, ContinueOnError|ContinueOnUndefined)
-	action.handlerElemType = goutil.DereferenceType(reflect.TypeOf(handler))
 
-	switch action.handlerElemType.Kind() {
+	handlerElemType := goutil.DereferenceType(reflect.TypeOf(handler))
+	switch handlerElemType.Kind() {
 	case reflect.Struct:
-		err := action.flagSet.StructVars(handler)
+		var ok bool
+		action.handlerFactory, ok = handler.(DeepCopier)
+		if !ok {
+			action.handlerFactory = &handlerFactory{elemType: handlerElemType}
+		}
+		err := action.flagSet.StructVars(action.handlerFactory.DeepCopy())
 		if err != nil {
 			return nil, err
 		}
@@ -482,7 +505,7 @@ func (a *Action) Description() string {
 func (a *Action) Exec(c context.Context, options []string) (stat *Status) {
 	defer status.Catch(&stat)
 	cmdName := a.flagSet.Name()
-	a.handle(newContext(c, cmdName, map[string][]string{cmdName: options}))
+	a.handle(newContext(c, cmdName, []*ArgsInfo{{Command: cmdName, Options: options}}))
 	return
 }
 
@@ -494,9 +517,9 @@ func (a *Action) handle(c *Context) {
 		return
 	}
 	flagSet := NewFlagSet(cmdName, a.flagSet.ErrorHandling())
-	newObj := reflect.New(a.handlerElemType).Interface()
+	newObj := a.handlerFactory.DeepCopy()
 	flagSet.StructVars(newObj)
-	err := flagSet.Parse(c.argsGroup[cmdName])
+	err := flagSet.Parse(c.getOptions(cmdName))
 	c.CheckStatus(err, StatusParseFailed, "")
 	if a.validateFunc != nil {
 		err = a.validateFunc(newObj)
@@ -505,7 +528,7 @@ func (a *Action) handle(c *Context) {
 	newObj.(Handler).Handle(c)
 }
 
-func newContext(ctx context.Context, cmdName string, argsGroup map[string][]string) *Context {
+func newContext(ctx context.Context, cmdName string, argsGroup []*ArgsInfo) *Context {
 	return &Context{
 		Context:   context.WithValue(ctx, currCmdName, cmdName),
 		argsGroup: argsGroup,
@@ -524,13 +547,23 @@ func (c *Context) CmdName() string {
 	return cmdName
 }
 
-// Args returns the current command and options.
+// ArgsInfo returns the current command and options.
 // NOTE:
 //  global command name is ""
-func (c *Context) Args() (cmdName string, options []string) {
+func (c *Context) ArgsInfo() *ArgsInfo {
+	cmdName := c.CmdName()
+	options := goutil.CopyStrings(c.getOptions(cmdName))
+	return &ArgsInfo{Command: cmdName, Options: options}
+}
+
+func (c *Context) getOptions(cmdName string) (options []string) {
 	cmdName = c.CmdName()
-	options = c.argsGroup[cmdName]
-	return cmdName, options
+	for _, argsInfo := range c.argsGroup {
+		if argsInfo.Command == cmdName {
+			return argsInfo.Options
+		}
+	}
+	return nil
 }
 
 // ThrowStatus creates a status with stack, and panic.
@@ -560,14 +593,13 @@ func (a Author) String() string {
 	return fmt.Sprintf("%v%v", a.Name, e)
 }
 
-func pickCommandAndOptions(arguments []string) (r map[string][]string, err error) {
+func pickArgsInfo(arguments []string) (r []*ArgsInfo, err error) {
 	cmd, args := pickCommand(arguments)
 	tidiedArgs, args, err := tidyArgs(args, func(string) (want bool, next bool) { return true, true })
 	if err != nil {
 		return
 	}
-	r = make(map[string][]string, 2)
-	r[cmd] = tidiedArgs
+	r = append(r, &ArgsInfo{Command: cmd, Options: tidiedArgs})
 	if len(args) == 0 {
 		return
 	}
@@ -579,7 +611,7 @@ func pickCommandAndOptions(arguments []string) (r map[string][]string, err error
 	if err != nil {
 		return
 	}
-	r[cmd] = tidiedArgs
+	r = append(r, &ArgsInfo{Command: cmd, Options: tidiedArgs})
 	return
 }
 
