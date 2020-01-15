@@ -111,12 +111,13 @@ func ExampleApp() {
 	app.SetCompiled(date)
 	app.Use(Mw2)
 	app.SetOptions(new(GlobalHandler))
-	app.SetNotFound(func(c *flagx.Context) {
+	app.SetNotFound(func(c *flagx.Context) *flagx.Status {
 		cmdName, options := c.Args()
 		fmt.Printf(
 			"Not Found, args: cmd=%q, options=%v\n",
 			cmdName, options,
 		)
+		return nil
 	})
 	app.MustAddAction("a", "test-a", new(AHandler))
 	app.MustAddAction("c", "test-c", flagx.HandlerFunc(CHandler))
@@ -157,7 +158,7 @@ func ExampleApp() {
 	// Mw2: cmd="", options=[] end
 }
 
-func Mw2(c *flagx.Context, next func(*flagx.Context)) error {
+func Mw2(c *flagx.Context, next flagx.HandlerFunc) *flagx.Status {
 	cmdName, options := c.Args()
 	fmt.Printf(
 		"Mw2: cmd=%q, options=%v start\n",
@@ -169,30 +170,32 @@ func Mw2(c *flagx.Context, next func(*flagx.Context)) error {
 			cmdName, options,
 		)
 	}()
-	next(c)
-	return nil
+	return next(c)
 }
 
 type GlobalHandler struct {
 	G string `flag:"g;usage=GlobalHandler"`
 }
 
-func (g *GlobalHandler) Handle(c *flagx.Context) {
+func (g *GlobalHandler) Handle(c *flagx.Context) *flagx.Status {
 	cmdName, options := c.Args()
 	fmt.Printf("GlobalHandler cmd=%q, options=%v, -g=%s\n", cmdName, options, g.G)
+	return nil
 }
 
 type AHandler struct {
 	A string `flag:"a;usage=AHandler"`
 }
 
-func (a *AHandler) Handle(c *flagx.Context) {
+func (a *AHandler) Handle(c *flagx.Context) *flagx.Status {
 	cmdName, options := c.Args()
 	fmt.Printf("AHandler cmd=%q, options=%v, -a=%s\n", cmdName, options, a.A)
+	return nil
 }
 
-func CHandler(c *flagx.Context) {
+func CHandler(c *flagx.Context) *flagx.Status {
 	cmdName, options := c.Args()
 	fmt.Printf("CHandler cmd=%q, options=%v\n", cmdName, options)
+	return nil
 }
 ```

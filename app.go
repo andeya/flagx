@@ -57,18 +57,28 @@ type (
 	}
 	// Handler handler of action
 	Handler interface {
-		Handle(*Context)
+		Handle(*Context) *Status
 	}
 	// HandlerFunc handler function
-	HandlerFunc func(*Context)
+	HandlerFunc func(*Context) *Status
 	// Middleware middleware of an action execution
-	Middleware func(c *Context, next func(*Context)) error
+	Middleware func(c *Context, next HandlerFunc) *Status
 	// Context context of an action execution
 	Context struct {
 		context.Context
 		argsGroup map[string][]string
 	}
+	// Status a handling status with code, msg, cause and stack.
+	Status     = status.Status
 	contextKey int8
+)
+
+// Status code
+const (
+	StatusBadArgs        int32 = 1
+	StatusNotFound       int32 = 2
+	StatusParseFailed    int32 = 3
+	StatusValidateFailed int32 = 4
 )
 
 const (
@@ -225,8 +235,8 @@ func (a *App) Use(mw Middleware) {
 }
 
 // Handle implementes Handler interface.
-func (fn HandlerFunc) Handle(c *Context) {
-	fn(c)
+func (fn HandlerFunc) Handle(c *Context) *Status {
+	return fn(c)
 }
 
 // MustSetOptions sets the global options actions.
@@ -303,7 +313,7 @@ func (a *App) Actions() []*Action {
 }
 
 // Exec executes application based on the arguments.
-func (a *App) Exec(ctx context.Context, arguments []string) (stat *status.Status) {
+func (a *App) Exec(ctx context.Context, arguments []string) (stat *Status) {
 	defer status.Catch(&stat)
 	handle, ctxObj := a.route(ctx, arguments)
 	handle(ctxObj)
@@ -313,41 +323,45 @@ func (a *App) Exec(ctx context.Context, arguments []string) (stat *status.Status
 func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Context) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	argsGroup, err := pickCommandAndArguments(arguments)
-	status.Check(err, 1, "")
+	argsGroup, err := pickCommandAndOptions(arguments)
+	status.Check(err, StatusBadArgs, "")
 	var ctxObj = &Context{argsGroup: argsGroup, Context: ctx}
 	var actions = make([]*Action, 0, 2)
-	var handlerFunc func(c *Context)
+	var handlerFunc func(c *Context) *Status
 
 	for cmdName := range argsGroup {
 		action := a.actions[cmdName]
 		if action == nil {
 			if a.notFound != nil {
 				// middleware is still executed
-				handlerFunc = func(c *Context) {
-					a.notFound(c.new(cmdName))
+				handlerFunc = func(c *Context) *Status {
+					return a.notFound(c.new(cmdName))
 				}
 				break
 			}
 			if cmdName == "" {
-				status.Throw(1, "not support global flags", nil)
+				status.Throw(StatusNotFound, "not support global flags", nil)
 			}
-			status.Throw(2, fmt.Sprintf("subcommand %q is not defined", cmdName), nil)
+			status.Throw(StatusNotFound, fmt.Sprintf("subcommand %q is not defined", cmdName), nil)
 		}
 		actions = append(actions, action)
 	}
 	if handlerFunc == nil {
-		handlerFunc = func(c *Context) {
+		handlerFunc = func(c *Context) (stat *Status) {
 			for _, action := range actions {
-				action.handle(c)
+				stat = action.handle(c)
+				if !stat.OK() {
+					return stat
+				}
 			}
+			return stat
 		}
 	}
 	for i := len(a.middlewares) - 1; i >= 0; i-- {
 		middleware := a.middlewares[i]
 		nextHandle := handlerFunc
-		handlerFunc = func(c *Context) {
-			middleware(c, nextHandle)
+		handlerFunc = func(c *Context) *Status {
+			return middleware(c, nextHandle)
 		}
 	}
 	return handlerFunc, ctxObj
@@ -409,30 +423,31 @@ func (a *Action) Description() string {
 }
 
 // Exec executes the action alone.
-func (a *Action) Exec(c context.Context, options []string) error {
+func (a *Action) Exec(c context.Context, options []string) *Status {
 	cmdName := a.flagSet.Name()
 	return a.handle(newContext(c, cmdName, map[string][]string{cmdName: options}))
 }
 
-func (a *Action) handle(c *Context) error {
+func (a *Action) handle(c *Context) *Status {
 	cmdName := a.flagSet.Name()
 	c = c.new(cmdName)
 	if a.handlerFunc != nil {
-		a.handlerFunc(c)
-	} else {
-		flagSet := NewFlagSet(cmdName, a.flagSet.ErrorHandling())
-		newObj := reflect.New(a.handlerElemType).Interface()
-		flagSet.StructVars(newObj)
-		err := flagSet.Parse(c.argsGroup[cmdName])
-		if err == nil && a.validateFunc != nil {
-			err = a.validateFunc(newObj)
-		}
-		if err != nil {
-			return err
-		}
-		newObj.(Handler).Handle(c)
+		return a.handlerFunc(c)
 	}
-	return nil
+	flagSet := NewFlagSet(cmdName, a.flagSet.ErrorHandling())
+	newObj := reflect.New(a.handlerElemType).Interface()
+	flagSet.StructVars(newObj)
+	err := flagSet.Parse(c.argsGroup[cmdName])
+	if err != nil {
+		return status.New(StatusParseFailed, err.Error(), err)
+	}
+	if a.validateFunc != nil {
+		err = a.validateFunc(newObj)
+	}
+	if err != nil {
+		return status.New(StatusValidateFailed, err.Error(), err)
+	}
+	return newObj.(Handler).Handle(c)
 }
 
 func newContext(ctx context.Context, cmdName string, argsGroup map[string][]string) *Context {
@@ -472,7 +487,7 @@ func (a Author) String() string {
 	return fmt.Sprintf("%v%v", a.Name, e)
 }
 
-func pickCommandAndArguments(arguments []string) (r map[string][]string, err error) {
+func pickCommandAndOptions(arguments []string) (r map[string][]string, err error) {
 	cmd, args := pickCommand(arguments)
 	tidiedArgs, args, err := tidyArgs(args, func(string) (want bool, next bool) { return true, true })
 	if err != nil {
