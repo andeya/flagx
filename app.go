@@ -323,6 +323,8 @@ func (a *App) SetDefaultValidator(fn ValidateFunc) {
 
 // SetUsageTemplate sets usage template.
 func (a *App) SetUsageTemplate(tmpl *template.Template) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
 	a.usageTemplate = tmpl
 }
 
