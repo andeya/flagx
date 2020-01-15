@@ -36,6 +36,7 @@ type (
 		sortedActions    []*Action
 		usageText        string
 		defaultValidator ValidateFunc
+		usageTemplate    *template.Template
 		lock             sync.RWMutex
 	}
 	// ValidateFunc validator for struct flag
@@ -147,6 +148,7 @@ func (a *App) init() *App {
 	a.SetName("")
 	a.SetVersion("")
 	a.SetCompiled(time.Time{})
+	a.SetUsageTemplate(defaultAppUsageTemplate)
 	return a
 }
 
@@ -317,6 +319,11 @@ func (a *App) SetDefaultValidator(fn ValidateFunc) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.defaultValidator = fn
+}
+
+// SetUsageTemplate sets usage template.
+func (a *App) SetUsageTemplate(tmpl *template.Template) {
+	a.usageTemplate = tmpl
 }
 
 // MustAddAction adds an action.
@@ -583,8 +590,8 @@ func pickCommand(arguments []string) (string, []string) {
 	return "", arguments
 }
 
-// appUsageTemplate is the text template for the Default help topic.
-var appUsageTemplate = template.Must(template.New("appUsage").
+// defaultAppUsageTemplate is the text template for the Default help topic.
+var defaultAppUsageTemplate = template.Must(template.New("appUsage").
 	Funcs(template.FuncMap{"join": strings.Join}).
 	Parse(`{{if .AppName}}{{.AppName}}{{else}}{{.CmdName}}{{end}}{{if .Version}} - v{{.Version}}{{end}}{{if .Description}}
 
@@ -608,6 +615,10 @@ COPYRIGHT:
 `))
 
 func (a *App) updateUsageLocked() {
+	if a.usageTemplate == nil {
+		a.usageText = ""
+		return
+	}
 	var data = map[string]interface{}{
 		"AppName":     a.appName,
 		"CmdName":     a.cmdName,
@@ -642,7 +653,7 @@ func (a *App) updateUsageLocked() {
 	}
 
 	var buf bytes.Buffer
-	err := appUsageTemplate.Execute(&buf, data)
+	err := a.usageTemplate.Execute(&buf, data)
 	if err != nil {
 		panic(err)
 	}
