@@ -85,6 +85,50 @@ const (
 	currCmdName contextKey = iota
 )
 
+var (
+	// NewStatus creates a message status with code, msg and cause.
+	// NOTE:
+	//  code=0 means no error
+	// TYPE:
+	//  func NewStatus(code int32, msg string, cause interface{}) *Status
+	NewStatus = status.New
+
+	// NewStatusWithStack creates a message status with code, msg and cause and stack.
+	// NOTE:
+	//  code=0 means no error
+	// TYPE:
+	//  func NewStatusWithStack(code int32, msg string, cause interface{}) *Status
+	NewStatusWithStack = status.NewWithStack
+
+	// NewStatusFromQuery parses the query bytes to a status object.
+	// TYPE:
+	//  func NewStatusFromQuery(b []byte, tagStack bool) *Status
+	NewStatusFromQuery = status.FromQuery
+	// CheckStatus if err!=nil, create a status with stack, and panic.
+	// NOTE:
+	//  If err!=nil and msg=="", error text is set to msg
+	// TYPE:
+	//  func Check(err error, code int32, msg string, whenError ...func())
+	CheckStatus = status.Check
+	// ThrowStatus creates a status with stack, and panic.
+	// TYPE:
+	//  func Throw(code int32, msg string, cause interface{})
+	ThrowStatus = status.Throw
+	// PanicStatus panic with stack trace.
+	// TYPE:
+	//  func Panic(stat *Status)
+	PanicStatus = status.Panic
+	// CatchStatus recovers the panic and returns status.
+	// NOTE:
+	//  Set `realStat` to true if a `Status` type is recovered
+	// Example:
+	//  var stat *Status
+	//  defer Catch(&stat)
+	// TYPE:
+	//  func Catch(statPtr **Status, realStat ...*bool)
+	CatchStatus = status.Catch
+)
+
 // NewApp creates a new application.
 func NewApp() *App {
 	a := new(App)
@@ -327,7 +371,7 @@ func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Cont
 	defer a.lock.RUnlock()
 	argsGroup, err := pickCommandAndOptions(arguments)
 	if err != nil {
-		return nil, nil, status.New(StatusBadArgs, "bad arguments", err)
+		return nil, nil, NewStatus(StatusBadArgs, "bad arguments", err)
 	}
 	var ctxObj = &Context{argsGroup: argsGroup, Context: ctx}
 	var actions = make([]*Action, 0, 2)
@@ -344,9 +388,9 @@ func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Cont
 				break
 			}
 			if cmdName == "" {
-				return nil, nil, status.New(StatusNotFound, "not support global options", nil)
+				return nil, nil, NewStatus(StatusNotFound, "not support global options", nil)
 			}
-			return nil, nil, status.New(StatusNotFound, "subcommand %q is not defined", nil)
+			return nil, nil, NewStatus(StatusNotFound, "subcommand %q is not defined", nil)
 		}
 		actions = append(actions, action)
 	}
@@ -443,13 +487,13 @@ func (a *Action) handle(c *Context) *Status {
 	flagSet.StructVars(newObj)
 	err := flagSet.Parse(c.argsGroup[cmdName])
 	if err != nil {
-		return status.New(StatusParseFailed, err.Error(), err)
+		return NewStatus(StatusParseFailed, err.Error(), err)
 	}
 	if a.validateFunc != nil {
 		err = a.validateFunc(newObj)
 	}
 	if err != nil {
-		return status.New(StatusValidateFailed, err.Error(), err)
+		return NewStatus(StatusValidateFailed, err.Error(), err)
 	}
 	return newObj.(Handler).Handle(c)
 }
