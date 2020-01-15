@@ -315,12 +315,14 @@ func (a *App) Actions() []*Action {
 // Exec executes application based on the arguments.
 func (a *App) Exec(ctx context.Context, arguments []string) (stat *Status) {
 	defer status.Catch(&stat)
-	handle, ctxObj := a.route(ctx, arguments)
-	handle(ctxObj)
-	return nil
+	handle, ctxObj, stat := a.route(ctx, arguments)
+	if stat.OK() {
+		stat = handle(ctxObj)
+	}
+	return stat
 }
 
-func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Context) {
+func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Context, *Status) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	argsGroup, err := pickCommandAndOptions(arguments)
@@ -340,9 +342,9 @@ func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Cont
 				break
 			}
 			if cmdName == "" {
-				status.Throw(StatusNotFound, "not support global flags", nil)
+				return nil, nil, status.New(StatusNotFound, "not support global options", nil)
 			}
-			status.Throw(StatusNotFound, fmt.Sprintf("subcommand %q is not defined", cmdName), nil)
+			return nil, nil, status.New(StatusNotFound, "subcommand %q is not defined", nil)
 		}
 		actions = append(actions, action)
 	}
@@ -364,7 +366,7 @@ func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Cont
 			return middleware(c, nextHandle)
 		}
 	}
-	return handlerFunc, ctxObj
+	return handlerFunc, ctxObj, nil
 }
 
 // UsageText returns the usage text.
