@@ -326,7 +326,9 @@ func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Cont
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	argsGroup, err := pickCommandAndOptions(arguments)
-	status.Check(err, StatusBadArgs, "")
+	if err != nil {
+		return nil, nil, status.New(StatusBadArgs, "bad arguments", err)
+	}
 	var ctxObj = &Context{argsGroup: argsGroup, Context: ctx}
 	var actions = make([]*Action, 0, 2)
 	var handlerFunc func(c *Context) *Status
