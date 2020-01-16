@@ -71,7 +71,7 @@ func ExampleApp() {
 
 func TestApp(t *testing.T) {
 	app := flagx.NewApp()
-	app.SetName("TestApp")
+	app.SetCmdName("testapp")
 	app.SetDescription("this is a app for testing")
 	app.SetAuthors([]flagx.Author{{
 		Name:  "henrylee2cn",

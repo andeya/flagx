@@ -55,6 +55,7 @@ type (
 		handlerFactory DeepCopier
 		handlerFunc    HandlerFunc
 		validateFunc   func(interface{}) error
+		options        map[string]*Flag
 	}
 	// Handler handler of action
 	Handler interface {
@@ -475,6 +476,12 @@ func newAction(cmdName, desc string, handler Handler, validateFunc func(interfac
 		if err != nil {
 			return nil, err
 		}
+		action.flagSet.VisitAll(func(f *Flag) {
+			if action.options == nil {
+				action.options = make(map[string]*Flag)
+			}
+			action.options[f.Name] = f
+		})
 	case reflect.Func:
 		action.handlerFunc = handler.Handle
 	}
@@ -486,6 +493,9 @@ func newAction(cmdName, desc string, handler Handler, validateFunc func(interfac
 	action.usageBody = buf.String()
 	if cmdName != "" { // non-global command
 		action.usageText += fmt.Sprintf("%s # %s\n", cmdName, desc)
+	} else {
+		action.usageBody = strings.Replace(action.usageBody, "  -", "-", -1)
+		action.usageBody = strings.Replace(action.usageBody, "\n    \t", "\n  \t", -1)
 	}
 	action.usageText += action.usageBody
 	action.flagSet.SetOutput(ioutil.Discard)
@@ -500,6 +510,11 @@ func (a *Action) UsageText() string {
 // CmdName returns the command name of the action.
 func (a *Action) CmdName() string {
 	return a.flagSet.Name()
+}
+
+// Options returns the formal flags.
+func (a *Action) Options() map[string]*Flag {
+	return a.options
 }
 
 // Description returns description the of the action.
@@ -638,20 +653,20 @@ var defaultAppUsageTemplate = template.Must(template.New("appUsage").
 {{.Description}}{{end}}
 
 USAGE:
-   {{.CmdName}}{{if .Options}} [-globaloptions --]{{end}}{{if len .Commands}} [command] [-commandoptions]
+  {{.CmdName}}{{if .Options}} [-globaloptions --]{{end}}{{if len .Commands}} [command] [-commandoptions]
 
 COMMANDS:{{range .Commands}}
-$ {{$.CmdName}} {{.UsageText}}{{end}}{{end}}{{if .Options}}
+{{$.CmdName}} {{.UsageText}}{{end}}{{end}}{{if .Options}}
 
 GLOBAL OPTIONS:
 {{.Options.UsageText}}{{end}}{{if len .Authors}}
 
 AUTHOR{{with $length := len .Authors}}{{if ne 1 $length}}S{{end}}{{end}}:
 {{range $index, $author := .Authors}}{{if $index}}
-{{end}}{{$author}}{{end}}{{end}}{{if .Copyright}}
+{{end}}  {{$author}}{{end}}{{end}}{{if .Copyright}}
 
 COPYRIGHT:
-   {{.Copyright}}{{end}}
+  {{.Copyright}}{{end}}
 `))
 
 func (a *App) updateUsageLocked() {
@@ -677,7 +692,9 @@ func (a *App) updateUsageLocked() {
 		sort.Strings(nameList)
 		if nameList[0] == "" {
 			g := a.actions[nameList[0]]
-			data["Options"] = g
+			if len(g.Options()) > 0 {
+				data["Options"] = g
+			}
 			nameList = nameList[1:]
 			a.sortedActions = append(a.sortedActions, g)
 		}
