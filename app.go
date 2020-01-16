@@ -503,7 +503,10 @@ func newAction(cmdName, desc string, handler Handler, validateFunc func(interfac
 }
 
 // UsageText returns the usage text.
-func (a *Action) UsageText() string {
+func (a *Action) UsageText(prefix ...string) string {
+	if len(prefix) > 0 {
+		return strings.Replace(a.usageText, "\n", "\n"+prefix[0], -1)
+	}
 	return a.usageText
 }
 
