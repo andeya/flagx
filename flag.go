@@ -97,6 +97,7 @@ func (f *FlagSet) StructVars(p interface{}) error {
 // are defined and before flags are accessed by the program.
 // The return value will be ErrHelp if -help or -h were set but not defined.
 func (f *FlagSet) Parse(arguments []string) error {
+	_, arguments = SplitArgs(arguments)
 	if f.isContinueOnUndefined {
 		var err error
 		arguments, _, err = tidyArgs(arguments, func(name string) (want, next bool) {
@@ -110,16 +111,8 @@ func (f *FlagSet) Parse(arguments []string) error {
 }
 
 func tidyArgs(args []string, filter func(name string) (want, next bool)) (tidiedArgs, lastArgs []string, err error) {
-	lastArgs = args
 	tidiedArgs = make([]string, 0, len(args)*2)
-	var name string
-	var valuePtr *string
-	var seen bool
-	for {
-		lastArgs, name, valuePtr, seen, err = tidyOneArg(lastArgs)
-		if !seen {
-			return
-		}
+	lastArgs, err = filterArgs(args, func(name string, valuePtr *string) bool {
 		want, next := filter(name)
 		if want {
 			var kv []string
@@ -130,6 +123,22 @@ func tidyArgs(args []string, filter func(name string) (want, next bool)) (tidied
 			}
 			tidiedArgs = append(tidiedArgs, kv...)
 		}
+		return next
+	})
+	return tidiedArgs, lastArgs, err
+}
+
+func filterArgs(args []string, filter func(name string, valuePtr *string) (next bool)) (lastArgs []string, err error) {
+	lastArgs = args
+	var name string
+	var valuePtr *string
+	var seen bool
+	for {
+		lastArgs, name, valuePtr, seen, err = tidyOneArg(lastArgs)
+		if !seen {
+			return
+		}
+		next := filter(name, valuePtr)
 		if !next {
 			return
 		}

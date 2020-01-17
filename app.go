@@ -618,7 +618,7 @@ func (a Author) String() string {
 }
 
 func pickArgsInfo(arguments []string) (r []*ArgsInfo, err error) {
-	cmd, args := pickCommand(arguments)
+	cmd, args := SplitArgs(arguments)
 	tidiedArgs, args, err := tidyArgs(args, func(string) (want bool, next bool) { return true, true })
 	if err != nil {
 		return
@@ -627,7 +627,7 @@ func pickArgsInfo(arguments []string) (r []*ArgsInfo, err error) {
 	if len(args) == 0 {
 		return
 	}
-	cmd, args = pickCommand(args)
+	cmd, args = SplitArgs(args)
 	if cmd == "" {
 		return r, errors.New("subcommand is empty")
 	}
@@ -637,15 +637,6 @@ func pickArgsInfo(arguments []string) (r []*ArgsInfo, err error) {
 	}
 	r = append(r, &ArgsInfo{Command: cmd, Options: tidiedArgs})
 	return
-}
-
-func pickCommand(arguments []string) (string, []string) {
-	if len(arguments) > 0 {
-		if s := arguments[0]; len(s) > 0 && s[0] != '-' {
-			return s, arguments[1:]
-		}
-	}
-	return "", arguments
 }
 
 // defaultAppUsageTemplate is the text template for the Default help topic.

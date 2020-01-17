@@ -7,9 +7,58 @@ import (
 	"time"
 )
 
+// SplitArgs returns the command name and options.
+func SplitArgs(arguments []string) (string, []string) {
+	if len(arguments) > 0 {
+		if s := arguments[0]; len(s) > 0 && s[0] != '-' {
+			return s, arguments[1:]
+		}
+	}
+	return "", arguments
+}
+
+// Option command option
+type Option struct {
+	Command string
+	Name    string
+	Value   string
+}
+
+// LookupOptions lookups the options corresponding to the name
+// directly from the arguments.
+func LookupOptions(arguments []string, name string) []*Option {
+	if name == "" {
+		return nil
+	}
+	r := make([]*Option, 0, 2)
+	var err error
+	var cmd string
+	for {
+		cmd, arguments = SplitArgs(arguments)
+		arguments, err = filterArgs(arguments, func(key string, valPtr *string) bool {
+			if key == name {
+				var val string
+				if valPtr != nil {
+					val = *valPtr
+				}
+				r = append(r, &Option{
+					Command: cmd,
+					Name:    name,
+					Value:   val,
+				})
+			}
+			return true
+		})
+		if err != nil || len(arguments) == 0 {
+			return r
+		}
+	}
+}
+
 // LookupArgs lookups the value corresponding to the name
 // directly from the arguments.
 func LookupArgs(arguments []string, name string) (value string, found bool) {
+	_, arguments = SplitArgs(arguments)
 	filteredArgs, _, _ := tidyArgs(arguments, func(key string) (want, next bool) {
 		if key == name {
 			return true, false

@@ -115,3 +115,15 @@ func TestTidyArgs(t *testing.T) {
 	assert.Equal(t, []string{"-c", "2"}, tidiedArgs)
 	assert.Equal(t, []string{}, args)
 }
+
+func TestLookupOptions(t *testing.T) {
+	r := LookupOptions([]string{"-x", "--", "a", "-x=1", "--", "b", "-x=2", "-y"}, "x")
+	expected := []*Option{
+		{Command: "", Name: "x", Value: ""},
+		{Command: "a", Name: "x", Value: "1"},
+		{Command: "b", Name: "x", Value: "2"},
+	}
+	for i, option := range r {
+		assert.Equal(t, expected[i], option)
+	}
+}
