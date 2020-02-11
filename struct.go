@@ -110,7 +110,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 				return err
 			}
 			if isNon {
-				f.StringNonVar(val.(*string), idx, def, usage)
+				f.NonStringVar(val.(*string), idx, def, usage)
 			} else {
 				f.FlagSet.StringVar(val.(*string), name, def, usage)
 			}
@@ -129,7 +129,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 				return err
 			}
 			if isNon {
-				f.BoolNonVar(val.(*bool), idx, b, usage)
+				f.NonBoolVar(val.(*bool), idx, b, usage)
 			} else {
 				f.FlagSet.BoolVar(val.(*bool), name, b, usage)
 			}
@@ -148,7 +148,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 				return err
 			}
 			if isNon {
-				f.Float64NonVar(val.(*float64), idx, b, usage)
+				f.NonFloat64Var(val.(*float64), idx, b, usage)
 			} else {
 				f.FlagSet.Float64Var(val.(*float64), name, b, usage)
 			}
@@ -167,7 +167,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 				return err
 			}
 			if isNon {
-				f.IntNonVar(val.(*int), idx, b, usage)
+				f.NonIntVar(val.(*int), idx, b, usage)
 			} else {
 				f.FlagSet.IntVar(val.(*int), name, b, usage)
 			}
@@ -187,7 +187,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 					return err
 				}
 				if isNon {
-					f.DurationNonVar(val.(*time.Duration), idx, b, usage)
+					f.NonDurationVar(val.(*time.Duration), idx, b, usage)
 				} else {
 					f.FlagSet.DurationVar(val.(*time.Duration), name, b, usage)
 				}
@@ -206,7 +206,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 					return err
 				}
 				if isNon {
-					f.Int64NonVar(val.(*int64), idx, b, usage)
+					f.NonInt64Var(val.(*int64), idx, b, usage)
 				} else {
 					f.FlagSet.Int64Var(val.(*int64), name, b, usage)
 				}
@@ -227,7 +227,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 				return err
 			}
 			if isNon {
-				f.UintNonVar(val.(*uint), idx, b, usage)
+				f.NonUintVar(val.(*uint), idx, b, usage)
 			} else {
 				f.FlagSet.UintVar(val.(*uint), name, b, usage)
 			}
@@ -246,7 +246,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 				return err
 			}
 			if isNon {
-				f.Uint64NonVar(val.(*uint64), idx, b, usage)
+				f.NonUint64Var(val.(*uint64), idx, b, usage)
 			} else {
 				f.FlagSet.Uint64Var(val.(*uint64), name, b, usage)
 			}

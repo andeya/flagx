@@ -113,117 +113,117 @@ func (f *FlagSet) StructVars(p interface{}) error {
 	return fmt.Errorf("flagx: want struct pointer parameter, but got %T", p)
 }
 
-// BoolNonVar defines a bool non-flag with specified index, default value, and usage string.
+// NonBoolVar defines a bool non-flag with specified index, default value, and usage string.
 // The argument p points to a bool variable in which to store the value of the non-flag.
-func (f *FlagSet) BoolNonVar(p *bool, index int, value bool, usage string) {
+func (f *FlagSet) NonBoolVar(p *bool, index int, value bool, usage string) {
 	f.NonVar(newBoolValue(value, p), index, usage)
 }
 
-// BoolNon defines a bool non-flag with specified index, default value, and usage string.
+// NonBool defines a bool non-flag with specified index, default value, and usage string.
 // The return value is the address of a bool variable that stores the value of the non-flag.
-func (f *FlagSet) BoolNon(index int, value bool, usage string) *bool {
+func (f *FlagSet) NonBool(index int, value bool, usage string) *bool {
 	p := new(bool)
-	f.BoolNonVar(p, index, value, usage)
+	f.NonBoolVar(p, index, value, usage)
 	return p
 }
 
-// IntNonVar defines an int non-flag with specified index, default value, and usage string.
+// NonIntVar defines an int non-flag with specified index, default value, and usage string.
 // The argument p points to an int variable in which to store the value of the non-flag.
-func (f *FlagSet) IntNonVar(p *int, index int, value int, usage string) {
+func (f *FlagSet) NonIntVar(p *int, index int, value int, usage string) {
 	f.NonVar(newIntValue(value, p), index, usage)
 }
 
-// IntNon defines an int non-flag with specified index, default value, and usage string.
+// NonInt defines an int non-flag with specified index, default value, and usage string.
 // The return value is the address of an int variable that stores the value of the non-flag.
-func (f *FlagSet) IntNon(index int, value int, usage string) *int {
+func (f *FlagSet) NonInt(index int, value int, usage string) *int {
 	p := new(int)
-	f.IntNonVar(p, index, value, usage)
+	f.NonIntVar(p, index, value, usage)
 	return p
 }
 
-// Int64NonVar defines an int64 non-flag with specified index, default value, and usage string.
+// NonInt64Var defines an int64 non-flag with specified index, default value, and usage string.
 // The argument p points to an int64 variable in which to store the value of the non-flag.
-func (f *FlagSet) Int64NonVar(p *int64, index int, value int64, usage string) {
+func (f *FlagSet) NonInt64Var(p *int64, index int, value int64, usage string) {
 	f.NonVar(newInt64Value(value, p), index, usage)
 }
 
-// Int64Non defines an int64 non-flag with specified index, default value, and usage string.
+// NonInt64 defines an int64 non-flag with specified index, default value, and usage string.
 // The return value is the address of an int64 variable that stores the value of the non-flag.
-func (f *FlagSet) Int64Non(index int, value int64, usage string) *int64 {
+func (f *FlagSet) NonInt64(index int, value int64, usage string) *int64 {
 	p := new(int64)
-	f.Int64NonVar(p, index, value, usage)
+	f.NonInt64Var(p, index, value, usage)
 	return p
 }
 
-// UintNonVar defines a uint non-flag with specified index, default value, and usage string.
+// NonUintVar defines a uint non-flag with specified index, default value, and usage string.
 // The argument p points to a uint variable in which to store the value of the non-flag.
-func (f *FlagSet) UintNonVar(p *uint, index int, value uint, usage string) {
+func (f *FlagSet) NonUintVar(p *uint, index int, value uint, usage string) {
 	f.NonVar(newUintValue(value, p), index, usage)
 }
 
-// UintNon defines a uint non-flag with specified index, default value, and usage string.
+// NonUint defines a uint non-flag with specified index, default value, and usage string.
 // The return value is the address of a uint variable that stores the value of the non-flag.
-func (f *FlagSet) UintNon(index int, value uint, usage string) *uint {
+func (f *FlagSet) NonUint(index int, value uint, usage string) *uint {
 	p := new(uint)
-	f.UintNonVar(p, index, value, usage)
+	f.NonUintVar(p, index, value, usage)
 	return p
 }
 
-// Uint64NonVar defines a uint64 non-flag with specified index, default value, and usage string.
+// NonUint64Var defines a uint64 non-flag with specified index, default value, and usage string.
 // The argument p points to a uint64 variable in which to store the value of the non-flag.
-func (f *FlagSet) Uint64NonVar(p *uint64, index int, value uint64, usage string) {
+func (f *FlagSet) NonUint64Var(p *uint64, index int, value uint64, usage string) {
 	f.NonVar(newUint64Value(value, p), index, usage)
 }
 
-// Uint64Non defines a uint64 non-flag with specified index, default value, and usage string.
+// NonUint64 defines a uint64 non-flag with specified index, default value, and usage string.
 // The return value is the address of a uint64 variable that stores the value of the non-flag.
-func (f *FlagSet) Uint64Non(index int, value uint64, usage string) *uint64 {
+func (f *FlagSet) NonUint64(index int, value uint64, usage string) *uint64 {
 	p := new(uint64)
-	f.Uint64NonVar(p, index, value, usage)
+	f.NonUint64Var(p, index, value, usage)
 	return p
 }
 
-// StringNonVar defines a string non-flag with specified index, default value, and usage string.
+// NonStringVar defines a string non-flag with specified index, default value, and usage string.
 // The argument p points to a string variable in which to store the value of the non-flag.
-func (f *FlagSet) StringNonVar(p *string, index int, value string, usage string) {
+func (f *FlagSet) NonStringVar(p *string, index int, value string, usage string) {
 	f.NonVar(newStringValue(value, p), index, usage)
 }
 
-// StringNon defines a string non-flag with specified index, default value, and usage string.
+// NonString defines a string non-flag with specified index, default value, and usage string.
 // The return value is the address of a string variable that stores the value of the non-flag.
-func (f *FlagSet) StringNon(index int, value string, usage string) *string {
+func (f *FlagSet) NonString(index int, value string, usage string) *string {
 	p := new(string)
-	f.StringNonVar(p, index, value, usage)
+	f.NonStringVar(p, index, value, usage)
 	return p
 }
 
-// Float64NonVar defines a float64 non-flag with specified index, default value, and usage string.
+// NonFloat64Var defines a float64 non-flag with specified index, default value, and usage string.
 // The argument p points to a float64 variable in which to store the value of the non-flag.
-func (f *FlagSet) Float64NonVar(p *float64, index int, value float64, usage string) {
+func (f *FlagSet) NonFloat64Var(p *float64, index int, value float64, usage string) {
 	f.NonVar(newFloat64Value(value, p), index, usage)
 }
 
-// Float64Non defines a float64 non-flag with specified index, default value, and usage string.
+// NonFloat64 defines a float64 non-flag with specified index, default value, and usage string.
 // The return value is the address of a float64 variable that stores the value of the non-flag.
-func (f *FlagSet) Float64Non(index int, value float64, usage string) *float64 {
+func (f *FlagSet) NonFloat64(index int, value float64, usage string) *float64 {
 	p := new(float64)
-	f.Float64NonVar(p, index, value, usage)
+	f.NonFloat64Var(p, index, value, usage)
 	return p
 }
 
-// DurationNonVar defines a time.Duration non-flag with specified index, default value, and usage string.
+// NonDurationVar defines a time.Duration non-flag with specified index, default value, and usage string.
 // The argument p points to a time.Duration variable in which to store the value of the non-flag.
 // The non-flag accepts a value acceptable to time.ParseDuration.
-func (f *FlagSet) DurationNonVar(p *time.Duration, index int, value time.Duration, usage string) {
+func (f *FlagSet) NonDurationVar(p *time.Duration, index int, value time.Duration, usage string) {
 	f.NonVar(newDurationValue(value, p), index, usage)
 }
 
-// DurationNon defines a time.Duration non-flag with specified index, default value, and usage string.
+// NonDuration defines a time.Duration non-flag with specified index, default value, and usage string.
 // The return value is the address of a time.Duration variable that stores the value of the non-flag.
 // The non-flag accepts a value acceptable to time.ParseDuration.
-func (f *FlagSet) DurationNon(index int, value time.Duration, usage string) *time.Duration {
+func (f *FlagSet) NonDuration(index int, value time.Duration, usage string) *time.Duration {
 	p := new(time.Duration)
-	f.DurationNonVar(p, index, value, usage)
+	f.NonDurationVar(p, index, value, usage)
 	return p
 }
 
