@@ -619,14 +619,18 @@ func (a Author) String() string {
 
 func pickArgsInfo(arguments []string) (r []*ArgsInfo, err error) {
 	cmd, args := SplitArgs(arguments)
-	tidiedArgs, args, _, err := tidyArgs(args, func(string) (want bool, next bool) {
+	tidiedArgs, args, hasSubcommand, err := tidyArgs(args, func(string) (want bool, next bool) {
 		return true, true
 	})
 	if err != nil {
 		return
 	}
-	r = append(r, &ArgsInfo{Command: cmd, Options: tidiedArgs})
-	if len(args) == 0 {
+	if hasSubcommand {
+		r = append(r, &ArgsInfo{Command: cmd, Options: tidiedArgs})
+	} else {
+		r = append(r, &ArgsInfo{Command: cmd, Options: append(tidiedArgs, args...)})
+	}
+	if !hasSubcommand || len(args) == 0 {
 		return
 	}
 	cmd, args = SplitArgs(args)

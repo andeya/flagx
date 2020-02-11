@@ -33,7 +33,7 @@ func ExampleApp() {
 	app.MustAddAction("a", "test-a", new(AHandler))
 	app.MustAddAction("c", "test-c", flagx.HandlerFunc(CHandler))
 
-	stat := app.Exec(context.TODO(), []string{"a", "-a", "x"})
+	stat := app.Exec(context.TODO(), []string{"a", "-a", "x", "~/a/b"})
 	if !stat.OK() {
 		panic(stat)
 	}
@@ -55,7 +55,7 @@ func ExampleApp() {
 
 	// Output:
 	// Mw2: cmd="", options=[] start
-	// AHandler cmd="a", options=[-a x], -a=x
+	// AHandler cmd="a", options=[-a x ~/a/b], object=&{A:x Path:~/a/b}
 	// Mw2: cmd="", options=[] end
 	// Mw2: cmd="", options=[] start
 	// CHandler cmd="c", options=[]
@@ -154,12 +154,13 @@ func (g *GlobalHandler) Handle(c *flagx.Context) {
 }
 
 type AHandler struct {
-	A string `flag:"a;usage=AHandler"`
+	A    string `flag:"a;usage=AHandler"`
+	Path string `flag:"?0"`
 }
 
 func (a *AHandler) Handle(c *flagx.Context) {
 	argsInfo := c.ArgsInfo()
-	fmt.Printf("AHandler cmd=%q, options=%v, -a=%s\n", argsInfo.Command, argsInfo.Options, a.A)
+	fmt.Printf("AHandler cmd=%q, options=%v, object=%+v\n", argsInfo.Command, argsInfo.Options, a)
 }
 
 type BHandler struct {
