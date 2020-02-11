@@ -56,3 +56,12 @@ func TestUnquoteUsage(t *testing.T) {
 	})
 	fs.Usage()
 }
+
+func TestSubArgs(t *testing.T) {
+	fs := NewFlagSet("non-flag-test1", ContinueOnError)
+	runVal := fs.String("run", "", "")
+	err := fs.Parse([]string{"-run", "abc", "", "5s", "--", "-N=1", "-x", "y", "z"})
+	assert.NoError(t, err)
+	assert.Equal(t, "abc", *runVal)
+	assert.Equal(t, []string{"-N=1", "-x", "y", "z"}, fs.SubArgs())
+}

@@ -619,7 +619,9 @@ func (a Author) String() string {
 
 func pickArgsInfo(arguments []string) (r []*ArgsInfo, err error) {
 	cmd, args := SplitArgs(arguments)
-	tidiedArgs, args, err := tidyArgs(args, func(string) (want bool, next bool) { return true, true })
+	tidiedArgs, args, _, err := tidyArgs(args, func(string) (want bool, next bool) {
+		return true, true
+	})
 	if err != nil {
 		return
 	}
@@ -631,7 +633,9 @@ func pickArgsInfo(arguments []string) (r []*ArgsInfo, err error) {
 	if cmd == "" {
 		return r, errors.New("subcommand is empty")
 	}
-	tidiedArgs, args, err = tidyArgs(args, func(string) (want bool, next bool) { return true, true })
+	tidiedArgs, args, _, err = tidyArgs(args, func(string) (want bool, next bool) {
+		return true, true
+	})
 	if err != nil {
 		return
 	}

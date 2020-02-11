@@ -35,7 +35,7 @@ func LookupOptions(arguments []string, name string) []*Option {
 	var cmd string
 	for {
 		cmd, arguments = SplitArgs(arguments)
-		arguments, err = filterArgs(arguments, func(key string, valPtr *string) bool {
+		arguments, _, err = filterArgs(arguments, func(key string, valPtr *string) bool {
 			if key == name {
 				var val string
 				if valPtr != nil {
@@ -59,7 +59,7 @@ func LookupOptions(arguments []string, name string) []*Option {
 // directly from the arguments.
 func LookupArgs(arguments []string, name string) (value string, found bool) {
 	_, arguments = SplitArgs(arguments)
-	filteredArgs, _, _ := tidyArgs(arguments, func(key string) (want, next bool) {
+	filteredArgs, _, _, _ := tidyArgs(arguments, func(key string) (want, next bool) {
 		if key == name {
 			return true, false
 		}
@@ -105,6 +105,9 @@ func Arg(i int) string {
 func Args() []string {
 	return CommandLine.Args()
 }
+
+// SubArgs returns arguments of the next subcommand.
+func SubArgs() []string { return CommandLine.SubArgs() }
 
 // Bool defines a bool flag with specified name, default value, and usage string.
 // The return value is the address of a bool variable that stores the value of the flag.
@@ -166,6 +169,109 @@ func Int64Var(p *int64, name string, value int64, usage string) {
 // The argument p points to an int variable in which to store the value of the flag.
 func IntVar(p *int, name string, value int, usage string) {
 	CommandLine.IntVar(p, name, value, usage)
+}
+
+// BoolNonVar defines a bool non-flag with specified index, default value, and usage string.
+// The argument p points to a bool variable in which to store the value of the non-flag.
+func BoolNonVar(p *bool, index int, value bool, usage string) {
+	CommandLine.NonVar(newBoolValue(value, p), index, usage)
+}
+
+// BoolNon defines a bool non-flag with specified index, default value, and usage string.
+// The return value is the address of a bool variable that stores the value of the non-flag.
+func BoolNon(index int, value bool, usage string) *bool {
+	return CommandLine.BoolNon(index, value, usage)
+}
+
+// IntNonVar defines an int non-flag with specified index, default value, and usage string.
+// The argument p points to an int variable in which to store the value of the non-flag.
+func IntNonVar(p *int, index int, value int, usage string) {
+	CommandLine.NonVar(newIntValue(value, p), index, usage)
+}
+
+// IntNon defines an int non-flag with specified index, default value, and usage string.
+// The return value is the address of an int variable that stores the value of the non-flag.
+func IntNon(index int, value int, usage string) *int {
+	return CommandLine.IntNon(index, value, usage)
+}
+
+// Int64NonVar defines an int64 non-flag with specified index, default value, and usage string.
+// The argument p points to an int64 variable in which to store the value of the non-flag.
+func Int64NonVar(p *int64, index int, value int64, usage string) {
+	CommandLine.NonVar(newInt64Value(value, p), index, usage)
+}
+
+// Int64Non defines an int64 non-flag with specified index, default value, and usage string.
+// The return value is the address of an int64 variable that stores the value of the non-flag.
+func Int64Non(index int, value int64, usage string) *int64 {
+	return CommandLine.Int64Non(index, value, usage)
+}
+
+// UintNonVar defines a uint non-flag with specified index, default value, and usage string.
+// The argument p points to a uint variable in which to store the value of the non-flag.
+func UintNonVar(p *uint, index int, value uint, usage string) {
+	CommandLine.NonVar(newUintValue(value, p), index, usage)
+}
+
+// UintNon defines a uint non-flag with specified index, default value, and usage string.
+// The return value is the address of a uint variable that stores the value of the non-flag.
+func UintNon(index int, value uint, usage string) *uint {
+	return CommandLine.UintNon(index, value, usage)
+}
+
+// Uint64NonVar defines a uint64 non-flag with specified index, default value, and usage string.
+// The argument p points to a uint64 variable in which to store the value of the non-flag.
+func Uint64NonVar(p *uint64, index int, value uint64, usage string) {
+	CommandLine.NonVar(newUint64Value(value, p), index, usage)
+}
+
+// Uint64Non defines a uint64 non-flag with specified index, default value, and usage string.
+// The return value is the address of a uint64 variable that stores the value of the non-flag.
+func Uint64Non(index int, value uint64, usage string) *uint64 {
+	return CommandLine.Uint64Non(index, value, usage)
+}
+
+// StringNonVar defines a string non-flag with specified index, default value, and usage string.
+// The argument p points to a string variable in which to store the value of the non-flag.
+func StringNonVar(p *string, index int, value string, usage string) {
+	CommandLine.NonVar(newStringValue(value, p), index, usage)
+}
+
+// StringNon defines a string non-flag with specified index, default value, and usage string.
+// The return value is the address of a string variable that stores the value of the non-flag.
+func StringNon(index int, value string, usage string) *string {
+	return CommandLine.StringNon(index, value, usage)
+}
+
+// Float64NonVar defines a float64 non-flag with specified index, default value, and usage string.
+// The argument p points to a float64 variable in which to store the value of the non-flag.
+func Float64NonVar(p *float64, index int, value float64, usage string) {
+	CommandLine.NonVar(newFloat64Value(value, p), index, usage)
+}
+
+// Float64Non defines a float64 non-flag with specified index, default value, and usage string.
+// The return value is the address of a float64 variable that stores the value of the non-flag.
+func Float64Non(index int, value float64, usage string) *float64 {
+	return CommandLine.Float64Non(index, value, usage)
+}
+
+// DurationNonVar defines a time.Duration non-flag with specified index, default value, and usage string.
+// The argument p points to a time.Duration variable in which to store the value of the non-flag.
+// The non-flag accepts a value acceptable to time.ParseDuration.
+func DurationNonVar(p *time.Duration, index int, value time.Duration, usage string) {
+	CommandLine.NonVar(newDurationValue(value, p), index, usage)
+}
+
+// DurationNon defines a time.Duration non with specified index, default value, and usage string.
+// The return value is the address of a time.Duration variable that stores the value of the non-flag.
+// The non-flag accepts a value acceptable to time.ParseDuration.
+func DurationNon(index int, value time.Duration, usage string) *time.Duration {
+	return CommandLine.DurationNon(index, value, usage)
+}
+
+// NonVar defines a non-flag with the specified index and usage string.
+func NonVar(value Value, index int, usage string) {
+	CommandLine.NonVar(value, index, usage)
 }
 
 // NArg is the number of arguments remaining after flags have been processed.

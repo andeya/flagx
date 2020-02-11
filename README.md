@@ -17,6 +17,8 @@ Standard flag package extension with more features, such as struct flag, app fra
     - `time.Duration`
 - Add `LookupArgs`: lookup the value corresponding to a name directly from arguments
 - Provide application framework
+- Support define non-flag
+    - Use `?(Index)` (such as `?0`, `?1`, `?2`) in struct tag to define non-flag
 - For more features, please open the issue
 
 ## Test Demo
@@ -44,12 +46,13 @@ func TestContinueOnUndefined(t *testing.T) {
 
 ```go
 func ExampleStructVars() {
-	os.Args = []string{"go test", "-test.timeout", "30s", "-test.v", "-test.count", "1", "-test.run", "^(TestStructVars)$"}
+	os.Args = []string{"go test", "-test.timeout", "30s", "-test.v", "-test.count", "1", "-test.run", "^(TestStructVars)$", "flag_test.go"}
 	type Args struct {
 		Run     string        `flag:"test.run; def=.*; usage=function name pattern"`
 		Timeout time.Duration `flag:"test.timeout"`
 		V       bool          `flag:"test.v"`
 		X       int           `flag:"def=10"`
+		Y       string        `flag:"?0"` // the first non-flag
 	}
 	var args Args
 	err := StructVars(&args)
@@ -59,7 +62,7 @@ func ExampleStructVars() {
 	Parse()
 	fmt.Printf("%+v\n", args)
 	// Output:
-	// {Run:^(TestStructVars)$ Timeout:30s V:true X:10}
+	// {Run:^(TestStructVars)$ Timeout:30s V:true X:10 Y:flag_test.go}
 }
 ```
 

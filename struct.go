@@ -17,6 +17,8 @@ const (
 	tagKeyOmit        = "-"
 	tagKeyNameDefault = "def"
 	tagKeyNameUsage   = "usage"
+	// tag name of the non-flag command-line arguments.
+	tagKeyNonFlag = "?"
 )
 
 var timeDurationTypeID = tpack.Unpack(time.Duration(0)).RuntimeTypeID()
@@ -103,7 +105,15 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 	switch kind {
 	case reflect.String:
 		for _, name := range names {
-			f.FlagSet.StringVar(val.(*string), name, def, usage)
+			idx, isNon, err := getNonFlagIndex(name)
+			if err != nil {
+				return err
+			}
+			if isNon {
+				f.StringNonVar(val.(*string), idx, def, usage)
+			} else {
+				f.FlagSet.StringVar(val.(*string), name, def, usage)
+			}
 		}
 	case reflect.Bool:
 		var b bool
@@ -114,7 +124,15 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 			}
 		}
 		for _, name := range names {
-			f.FlagSet.BoolVar(val.(*bool), name, b, usage)
+			idx, isNon, err := getNonFlagIndex(name)
+			if err != nil {
+				return err
+			}
+			if isNon {
+				f.BoolNonVar(val.(*bool), idx, b, usage)
+			} else {
+				f.FlagSet.BoolVar(val.(*bool), name, b, usage)
+			}
 		}
 	case reflect.Float64:
 		var b float64
@@ -125,7 +143,15 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 			}
 		}
 		for _, name := range names {
-			f.FlagSet.Float64Var(val.(*float64), name, b, usage)
+			idx, isNon, err := getNonFlagIndex(name)
+			if err != nil {
+				return err
+			}
+			if isNon {
+				f.Float64NonVar(val.(*float64), idx, b, usage)
+			} else {
+				f.FlagSet.Float64Var(val.(*float64), name, b, usage)
+			}
 		}
 	case reflect.Int:
 		var b int
@@ -136,7 +162,15 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 			}
 		}
 		for _, name := range names {
-			f.FlagSet.IntVar(val.(*int), name, b, usage)
+			idx, isNon, err := getNonFlagIndex(name)
+			if err != nil {
+				return err
+			}
+			if isNon {
+				f.IntNonVar(val.(*int), idx, b, usage)
+			} else {
+				f.FlagSet.IntVar(val.(*int), name, b, usage)
+			}
 		}
 	case reflect.Int64:
 		if tpack.RuntimeTypeID(elem.Type()) == timeDurationTypeID {
@@ -148,7 +182,15 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 				}
 			}
 			for _, name := range names {
-				f.FlagSet.DurationVar(val.(*time.Duration), name, b, usage)
+				idx, isNon, err := getNonFlagIndex(name)
+				if err != nil {
+					return err
+				}
+				if isNon {
+					f.DurationNonVar(val.(*time.Duration), idx, b, usage)
+				} else {
+					f.FlagSet.DurationVar(val.(*time.Duration), name, b, usage)
+				}
 			}
 		} else {
 			var b int64
@@ -159,7 +201,15 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 				}
 			}
 			for _, name := range names {
-				f.FlagSet.Int64Var(val.(*int64), name, b, usage)
+				idx, isNon, err := getNonFlagIndex(name)
+				if err != nil {
+					return err
+				}
+				if isNon {
+					f.Int64NonVar(val.(*int64), idx, b, usage)
+				} else {
+					f.FlagSet.Int64Var(val.(*int64), name, b, usage)
+				}
 			}
 		}
 	case reflect.Uint:
@@ -172,7 +222,15 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 			b = uint(b2)
 		}
 		for _, name := range names {
-			f.FlagSet.UintVar(val.(*uint), name, b, usage)
+			idx, isNon, err := getNonFlagIndex(name)
+			if err != nil {
+				return err
+			}
+			if isNon {
+				f.UintNonVar(val.(*uint), idx, b, usage)
+			} else {
+				f.FlagSet.UintVar(val.(*uint), name, b, usage)
+			}
 		}
 	case reflect.Uint64:
 		var b uint64
@@ -183,7 +241,15 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 			}
 		}
 		for _, name := range names {
-			f.FlagSet.Uint64Var(val.(*uint64), name, b, usage)
+			idx, isNon, err := getNonFlagIndex(name)
+			if err != nil {
+				return err
+			}
+			if isNon {
+				f.Uint64NonVar(val.(*uint64), idx, b, usage)
+			} else {
+				f.FlagSet.Uint64Var(val.(*uint64), name, b, usage)
+			}
 		}
 	default:
 		return fmt.Errorf("flagx: not support field type %s", elem.Type().String())
