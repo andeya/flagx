@@ -18,7 +18,7 @@ Standard flag package extension with more features, such as struct flag, app fra
 - Add `LookupArgs`: lookup the value corresponding to a name directly from arguments
 - Provide application framework
 - Support define non-flag
-    - Use `?(Index)` (such as `?0`, `?1`, `?2`) in struct tag to define non-flag
+    - Use `?{index}` (such as `?0`, `?1`, `?2`) in struct tag to define non-flag
 - For more features, please open the issue
 
 ## Test Demo
