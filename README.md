@@ -46,7 +46,14 @@ func TestContinueOnUndefined(t *testing.T) {
 
 ```go
 func ExampleStructVars() {
-	os.Args = []string{"go test", "-test.timeout", "30s", "-test.v", "-test.count", "1", "-test.run", "^(TestStructVars)$", "flag_test.go"}
+	os.Args = []string{
+		"go test",
+		"-test.timeout", "30s",
+		"-test.v",
+		"-test.count", "1",
+		"-test.run", "^(TestStructVars)$",
+		"flag_test.go",
+	}
 	type Args struct {
 		Run     string        `flag:"test.run; def=.*; usage=function name pattern"`
 		Timeout time.Duration `flag:"test.timeout"`
