@@ -301,7 +301,7 @@ func (a *App) Use(mw Middleware) {
 	a.middlewares = append(a.middlewares, mw)
 }
 
-// Handle implementes Handler interface.
+// Handle implements Handler interface.
 func (fn HandlerFunc) Handle(c *Context) {
 	fn(c)
 }
