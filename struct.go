@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/henrylee2cn/goutil"
+	"github.com/henrylee2cn/ameda"
 	"github.com/henrylee2cn/goutil/tpack"
 )
 
@@ -24,7 +24,7 @@ const (
 var timeDurationTypeID = tpack.Unpack(time.Duration(0)).RuntimeTypeID()
 
 func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[int32]struct{}) error {
-	v = goutil.DereferenceValue(v)
+	v = ameda.DereferenceValue(v)
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("flagx: want struct pointer field, but got %s", v.Type().String())
 	}
@@ -44,10 +44,10 @@ func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[int32]struct{
 		if tag == tagKeyOmit {
 			continue
 		}
-		if !goutil.InitPointer(fv) {
+		if !ameda.InitPointer(fv) {
 			return fmt.Errorf("flagx: can not set field %s, type=%s", ft.Name, ft.Type.String())
 		}
-		fvElem := goutil.DereferenceValue(fv)
+		fvElem := ameda.DereferenceValue(fv)
 		kind := fvElem.Kind()
 		switch kind {
 		case reflect.String,
@@ -61,7 +61,7 @@ func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[int32]struct{
 
 		default:
 			if !ok && kind == reflect.Struct && ft.Anonymous {
-				err := f.varFromStruct(goutil.DereferenceValue(fv), structTypeIDs)
+				err := f.varFromStruct(ameda.DereferenceValue(fv), structTypeIDs)
 				if err != nil {
 					return err
 				}

@@ -15,7 +15,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/henrylee2cn/goutil"
+	"github.com/henrylee2cn/ameda"
 	"github.com/henrylee2cn/goutil/status"
 )
 
@@ -464,7 +464,7 @@ func newAction(cmdName, desc string, handler Handler, validateFunc func(interfac
 	action.description = desc
 	action.flagSet = NewFlagSet(cmdName, ContinueOnError|ContinueOnUndefined)
 
-	handlerElemType := goutil.DereferenceType(reflect.TypeOf(handler))
+	handlerElemType := ameda.DereferenceType(reflect.TypeOf(handler))
 	switch handlerElemType.Kind() {
 	case reflect.Struct:
 		var ok bool
@@ -576,7 +576,7 @@ func (c *Context) CmdName() string {
 //  global command name is ""
 func (c *Context) ArgsInfo() *ArgsInfo {
 	cmdName := c.CmdName()
-	options := goutil.CopyStrings(c.getOptions(cmdName))
+	options := ameda.StringsCopy(c.getOptions(cmdName))
 	return &ArgsInfo{Command: cmdName, Options: options}
 }
 

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/henrylee2cn/ameda"
-	"github.com/henrylee2cn/goutil"
 )
 
 type (
@@ -104,7 +103,7 @@ func (f *FlagSet) SubArgs() []string {
 func (f *FlagSet) StructVars(p interface{}) error {
 	v := reflect.ValueOf(p)
 	if v.Kind() == reflect.Ptr {
-		v = goutil.DereferenceValue(v)
+		v = ameda.DereferenceValue(v)
 		if v.Kind() == reflect.Struct {
 			structTypeIDs := make(map[int32]struct{}, 4)
 			return f.varFromStruct(v, structTypeIDs)
