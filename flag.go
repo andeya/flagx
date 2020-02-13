@@ -375,6 +375,20 @@ func (f *FlagSet) defaultUsage() {
 	f.PrintDefaults()
 }
 
+// RangeAll visits the flags and non-flags in lexicographical order, calling fn for each.
+// It visits all flags and non-flags, even those not set.
+func (f *FlagSet) RangeAll(fn func(*Flag)) {
+	f.VisitAll(fn)
+	f.NonVisitAll(fn)
+}
+
+// Range visits the flags and non-flags in lexicographical order, calling fn for each.
+// It visits only those flags and non-flags that have been set.
+func (f *FlagSet) Range(fn func(*Flag)) {
+	f.Visit(fn)
+	f.NonVisit(fn)
+}
+
 // NonVisitAll visits the non-flags in lexicographical order, calling fn for each.
 // It visits all flags, even those not set.
 func (f *FlagSet) NonVisitAll(fn func(*Flag)) {
@@ -396,6 +410,16 @@ func (f *FlagSet) visitNonFlags(flags map[int]*Flag, fn func(*Flag)) {
 // It visits only those non-flags that have been set.
 func (f *FlagSet) NonVisit(fn func(*Flag)) {
 	f.visitNonFlags(f.nonActual, fn)
+}
+
+// Lookup returns the Flag structure of the named flag, returning nil if none exists.
+func (f *FlagSet) Lookup(name string) *Flag {
+	v := f.FlagSet.Lookup(name)
+	if v != nil {
+		return v
+	}
+	idx, _, _ := getNonFlagIndex(name)
+	return f.nonFormal[idx]
 }
 
 // PrintDefaults prints, to standard error unless configured otherwise, the
@@ -563,7 +587,7 @@ func getNonFlagName(index int) string {
 func getNonFlagIndex(name string) (int, bool, error) {
 	s := strings.TrimPrefix(name, tagKeyNonFlag)
 	if s == name {
-		return 0, false, nil
+		return -1, false, nil
 	}
 	i, err := ameda.StringToInt(s, true)
 	return i, true, err

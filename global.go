@@ -441,6 +441,18 @@ func Var(value Value, name string, usage string) {
 	CommandLine.Var(value, name, usage)
 }
 
+// RangeAll visits the command-line flags and non-flags in lexicographical order, calling fn for each.
+// It visits all flags and non-flags, even those not set.
+func RangeAll(fn func(*Flag)) {
+	CommandLine.RangeAll(fn)
+}
+
+// Range visits the command-line flags and non-flags in lexicographical order, calling fn for each.
+// It visits only those flags and non-flags that have been set.
+func Range(fn func(*Flag)) {
+	CommandLine.Range(fn)
+}
+
 // Visit visits the command-line flags in lexicographical order, calling fn
 // for each. It visits only those flags that have been set.
 func Visit(fn func(*Flag)) {
