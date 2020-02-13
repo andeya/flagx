@@ -466,20 +466,19 @@ func (a *App) SetUsageTemplate(tmpl *template.Template) {
 	a.usageTemplate = tmpl
 }
 
-// Exec executes application based on the arguments.
-func (a *App) Exec(ctx context.Context, arguments []string) (stat *Status) {
+// Exec executes the command.
+func (c *Command) Exec(ctx context.Context, arguments []string) (stat *Status) {
 	defer status.Catch(&stat)
-	handle, ctxObj := a.route(ctx, arguments)
+	handle, ctxObj := c.route(ctx, arguments)
 	handle(ctxObj)
 	return
 }
 
-func (a *App) route(ctx context.Context, arguments []string) (ActionFunc, *Context) {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-	filters, action, cmdPath, cmd, found := a.Command.findFiltersAndAction([]string{a.cmdName}, arguments)
+func (c *Command) route(ctx context.Context, arguments []string) (ActionFunc, *Context) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	filters, action, cmdPath, cmd, found := c.findFiltersAndAction([]string{c.cmdName}, arguments)
 	actionFunc := action.Handle
-	c := &Context{args: arguments, cmdPath: cmdPath, Context: ctx, cmd: cmd}
 	if found {
 		for i := len(filters) - 1; i >= 0; i-- {
 			filter := filters[i]
@@ -489,7 +488,7 @@ func (a *App) route(ctx context.Context, arguments []string) (ActionFunc, *Conte
 			}
 		}
 	}
-	return actionFunc, c
+	return actionFunc, &Context{args: arguments, cmdPath: cmdPath, Context: ctx, cmd: cmd}
 }
 
 func (c *Command) findFiltersAndAction(cmdPath, arguments []string) ([]Filter, Action, []string, *Command, bool) {
