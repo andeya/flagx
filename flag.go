@@ -3,6 +3,7 @@ package flagx
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"sort"
@@ -456,11 +457,11 @@ func (f *FlagSet) Set(name, value string) error {
 // default values of all defined command-line flags in the set. See the
 // documentation for the global function PrintDefaults for more information.
 func (f *FlagSet) PrintDefaults() {
-	f.VisitAll(f.newPrintOneDefault(true))
-	f.NonVisitAll(f.newPrintOneDefault(false))
+	f.VisitAll(newPrintOneDefault(f.Output(), true))
+	f.NonVisitAll(newPrintOneDefault(f.Output(), false))
 }
 
-func (f *FlagSet) newPrintOneDefault(isFlag bool) func(*Flag) {
+func newPrintOneDefault(w io.Writer, isFlag bool) func(*Flag) {
 	var prefix string
 	if isFlag {
 		prefix = "-"
@@ -490,7 +491,7 @@ func (f *FlagSet) newPrintOneDefault(isFlag bool) func(*Flag) {
 				s += fmt.Sprintf(" (default %v)", flag.DefValue)
 			}
 		}
-		fmt.Fprint(f.Output(), s, "\n")
+		fmt.Fprint(w, s, "\n")
 	}
 }
 
