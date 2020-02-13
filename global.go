@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -395,7 +394,7 @@ func UintVar(p *uint, name string, value uint, usage string) {
 // If there are no back quotes, the name is an educated guess of the
 // type of the flag's value, or the empty string if the flag is boolean.
 func UnquoteUsage(f *Flag) (name string, usage string) {
-	if !strings.HasPrefix(f.Name, "?") {
+	if !isNonFlag(f) {
 		return flag.UnquoteUsage(f)
 	}
 	// Look for a back-quoted name, but avoid the strings package.

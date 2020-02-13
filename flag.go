@@ -623,3 +623,7 @@ func getNonFlagIndex(name string) (int, bool, error) {
 	i, err := ameda.StringToInt(s, true)
 	return i, true, err
 }
+
+func isNonFlag(f *Flag) bool {
+	return strings.HasPrefix(f.Name, "?")
+}
