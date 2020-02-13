@@ -743,7 +743,11 @@ func (c *Command) newUsageLocked() (text string, body string) {
 	}
 	body = buf.String()
 	if c.parent != nil { // non-global command
-		text = fmt.Sprintf("$%s\n  %s\n", c.pathString(), c.description)
+		var ellipsis string
+		if c.action == nil {
+			ellipsis = " ..."
+		}
+		text = fmt.Sprintf("$%s%s\n  %s\n", c.pathString(), ellipsis, c.description)
 	} else {
 		body = strings.Replace(body, "  -?", "?", -1)
 		body = strings.Replace(body, "  -", "-", -1)
