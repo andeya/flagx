@@ -3,176 +3,134 @@ package flagx_test
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
 	"github.com/henrylee2cn/flagx"
-	"github.com/stretchr/testify/assert"
 )
 
 func ExampleApp() {
 	app := flagx.NewApp()
-	app.SetName("TestApp")
 	app.SetCmdName("testapp")
 	app.SetDescription("this is a app for testing")
 	app.SetAuthors([]flagx.Author{{
 		Name:  "henrylee2cn",
 		Email: "henrylee2cn@gmail.com",
 	}})
-	date, _ := time.Parse(time.RFC3339, "2020-01-10T15:17:03+08:00")
-	app.SetCompiled(date)
-	app.Use(Mw2)
-	app.SetOptions(new(GlobalHandler))
+
+	app.AddFilter(new(Filter1))
+	// cmd: testapp a
+	app.AddSubaction("a", "subcommand a", new(Action1))
+	b := app.AddSubcommand("b", "subcommand b", flagx.FilterFunc(Filter2))
+	{
+		// cmd: testapp b c
+		b.AddSubaction("c", "subcommand c", new(Action2))
+		// cmd: testapp b d
+		b.AddSubaction("d", "subcommand d", flagx.ActionFunc(Action3))
+	}
 	app.SetNotFound(func(c *flagx.Context) {
-		argsInfo := c.ArgsInfo()
 		fmt.Printf(
-			"Not Found, args: cmd=%q, options=%v\n",
-			argsInfo.Command, argsInfo.Options,
+			"NotFound: args=%+v\n",
+			c.Args(),
 		)
 	})
-	app.MustAddAction("a", "test-a", new(AHandler))
-	app.MustAddAction("c", "test-c", flagx.HandlerFunc(CHandler))
 
-	stat := app.Exec(context.TODO(), []string{"a", "-a", "x", "~/a/b"})
+	// test: testapp
+	// not found
+	stat := app.Exec(context.TODO(), []string{"-g=flagx", "false"})
 	if !stat.OK() {
 		panic(stat)
 	}
 
-	stat = app.Exec(context.TODO(), []string{"c"})
+	// test: testapp a
+	stat = app.Exec(context.TODO(), []string{"-g=henry", "true", "a", "-id", "1", "~/m/n"})
 	if !stat.OK() {
 		panic(stat)
 	}
 
-	stat = app.Exec(context.TODO(), []string{"-g", "g0", "--", "c"})
+	// test: testapp b
+	stat = app.Exec(context.TODO(), []string{"-g=flagx", "false", "b"})
 	if !stat.OK() {
 		panic(stat)
 	}
 
-	stat = app.Exec(context.TODO(), []string{"b", "-no"})
+	// test: testapp b c
+	// not found
+	stat = app.Exec(context.TODO(), []string{"-g=flagx", "false", "b", "c", "name=henry"})
+	if !stat.OK() {
+		panic(stat)
+	}
+
+	// test: testapp b d
+	stat = app.Exec(context.TODO(), []string{"-g=flagx", "false", "b", "d"})
 	if !stat.OK() {
 		panic(stat)
 	}
 
 	// Output:
-	// Mw2: cmd="", options=[] start
-	// AHandler cmd="a", options=[-a x ~/a/b], object=&{A:x Path:~/a/b}
-	// Mw2: cmd="", options=[] end
-	// Mw2: cmd="", options=[] start
-	// CHandler cmd="c", options=[]
-	// Mw2: cmd="", options=[] end
-	// Mw2: cmd="", options=[-g g0] start
-	// GlobalHandler cmd="", options=[-g g0], -g=g0
-	// CHandler cmd="c", options=[]
-	// Mw2: cmd="", options=[-g g0] end
-	// Mw2: cmd="", options=[] start
-	// Not Found, args: cmd="b", options=[-no]
-	// Mw2: cmd="", options=[] end
+	// NotFound: args=[-g=flagx false]
+	// Filter1 start: args=[-g=henry true a -id 1 ~/m/n], G=henry
+	// Action1: args=[-g=henry true a -id 1 ~/m/n], object=&{ID:1 Path:~/m/n}
+	// Filter1 end: args=[-g=henry true a -id 1 ~/m/n]
+	// NotFound: args=[-g=flagx false b]
+	// Filter1 start: args=[-g=flagx false b c name=henry], V=false
+	// Filter2 start: args=[-g=flagx false b c name=henry], start at=2020-02-13 13:48:15 +0800 CST
+	// Action2: args=[-g=flagx false b c name=henry], object=&{Name:}
+	// Filter2 end: args=[-g=flagx false b c name=henry], cost time=1µs
+	// Filter1 end: args=[-g=flagx false b c name=henry]
+	// Filter1 start: args=[-g=flagx false b d], V=false
+	// Filter2 start: args=[-g=flagx false b d], start at=2020-02-13 13:48:15 +0800 CST
+	// Action3: args=[-g=flagx false b d]
+	// Filter2 end: args=[-g=flagx false b d], cost time=1µs
+	// Filter1 end: args=[-g=flagx false b d]
 }
 
-func TestApp(t *testing.T) {
-	app := flagx.NewApp()
-	app.SetCmdName("testapp")
-	app.SetDescription("this is a app for testing")
-	app.SetAuthors([]flagx.Author{{
-		Name:  "henrylee2cn",
-		Email: "henrylee2cn@gmail.com",
-	}})
-	app.Use(Mw1)
-	app.Use(Mw2)
-
-	app.SetOptions(new(GlobalHandler))
-	app.MustAddAction("b", "test-b", new(BHandler))
-	app.MustAddAction("a", "test-a", new(AHandler))
-	app.MustAddAction("c", "test-c", flagx.HandlerFunc(CHandler))
-
-	stat := app.Exec(context.TODO(), []string{"-h"})
-	assert.NoError(t, stat.Cause())
-	fmt.Printf("%+v\n\n", stat)
-
-	stat = app.Exec(context.TODO(), []string{"a", "-a", "x"})
-	assert.Empty(t, stat.Code())
-	fmt.Printf("%+v\n\n", stat)
-
-	stat = app.Exec(context.TODO(), []string{"b", "-b", "y"})
-	assert.Empty(t, stat.Code())
-	fmt.Printf("%+v\n\n", stat)
-
-	stat = app.Exec(context.TODO(), []string{"c"})
-	assert.Empty(t, stat.Code())
-	fmt.Printf("%+v\n\n", stat)
-
-	stat = app.Exec(context.TODO(), []string{"-g", "z", "--", "c"})
-	assert.Empty(t, stat.Code())
-	fmt.Printf("%+v\n\n", stat)
-
-	app.SetNotFound(func(*flagx.Context) {
-		fmt.Println("404:", app.UsageText())
-	})
-	stat = app.Exec(context.TODO(), []string{"x"})
-	assert.Empty(t, stat.Code())
-	fmt.Printf("%+v\n\n", stat)
+type Filter1 struct {
+	G string `flag:"g;usage=global param g"`
+	V bool   `flag:"?0;usage=param view"`
 }
 
-func Mw1(c *flagx.Context, next flagx.HandlerFunc) {
-	t := time.Now()
-	argsInfo := c.ArgsInfo()
+func (f *Filter1) Filter(c *flagx.Context, next flagx.ActionFunc) {
+	if f.V {
+		fmt.Printf("Filter1 start: args=%+v, G=%s\n", c.Args(), f.G)
+	} else {
+		fmt.Printf("Filter1 start: args=%+v, V=%v\n", c.Args(), f.V)
+	}
+	defer fmt.Printf("Filter1 end: args=%+v\n", c.Args())
+	next(c)
+}
+
+func Filter2(c *flagx.Context, next flagx.ActionFunc) {
+	t := time.Unix(1581572895, 0)
 	fmt.Printf(
-		"Mw1: cmd=%q, options=%v, start at=%v\n",
-		argsInfo.Command, argsInfo.Options, t,
+		"Filter2 start: args=%+v, start at=%v\n",
+		c.Args(), t,
 	)
 	defer func() {
 		fmt.Printf(
-			"Mw1: cmd=%q, options=%v, cost time=%v\n",
-			argsInfo.Command, argsInfo.Options, time.Since(t),
+			"Filter2 end: args=%+v, cost time=%v\n",
+			c.Args(), time.Unix(1581572895, 1000).Sub(t),
 		)
 	}()
 	next(c)
 }
 
-func Mw2(c *flagx.Context, next flagx.HandlerFunc) {
-	argsInfo := c.ArgsInfo()
-	fmt.Printf(
-		"Mw2: cmd=%q, options=%v start\n",
-		argsInfo.Command, argsInfo.Options,
-	)
-	defer func() {
-		fmt.Printf(
-			"Mw2: cmd=%q, options=%v end\n",
-			argsInfo.Command, argsInfo.Options,
-		)
-	}()
-	next(c)
+type Action1 struct {
+	ID   int    `flag:"id;usage=param id"`
+	Path string `flag:"?0;usage=param path"`
 }
 
-type GlobalHandler struct {
-	G string `flag:"g;usage=GlobalHandler"`
+func (a *Action1) Handle(c *flagx.Context) {
+	fmt.Printf("Action1: args=%+v, object=%+v\n", c.Args(), a)
 }
 
-func (g *GlobalHandler) Handle(c *flagx.Context) {
-	argsInfo := c.ArgsInfo()
-	fmt.Printf("GlobalHandler cmd=%q, options=%v, -g=%s\n", argsInfo.Command, argsInfo.Options, g.G)
+type Action2 struct {
+	Name string `flag:"name;usage=param name"`
 }
 
-type AHandler struct {
-	A    string `flag:"a;usage=AHandler"`
-	Path string `flag:"?0"`
+func (a *Action2) Handle(c *flagx.Context) {
+	fmt.Printf("Action2: args=%+v, object=%+v\n", c.Args(), a)
 }
 
-func (a *AHandler) Handle(c *flagx.Context) {
-	argsInfo := c.ArgsInfo()
-	fmt.Printf("AHandler cmd=%q, options=%v, object=%+v\n", argsInfo.Command, argsInfo.Options, a)
-}
-
-type BHandler struct {
-	B string `flag:"b;usage=BHandler"`
-}
-
-func (b *BHandler) Handle(c *flagx.Context) {
-	argsInfo := c.ArgsInfo()
-	fmt.Printf("BHandler cmd=%q, options=%v, -b=%s\n", argsInfo.Command, argsInfo.Options, b.B)
-}
-
-func CHandler(c *flagx.Context) {
-	argsInfo := c.ArgsInfo()
-	fmt.Printf("CHandler cmd=%q, options=%v\n", argsInfo.Command, argsInfo.Options)
+func Action3(c *flagx.Context) {
+	fmt.Printf("Action3: args=%+v\n", c.Args())
 }

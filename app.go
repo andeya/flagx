@@ -3,13 +3,11 @@ package flagx
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
 	"text/template"
@@ -23,75 +21,95 @@ type (
 	// App is a application structure. It is recommended that
 	// an app be created with the flagx.NewApp() function
 	App struct {
-		appName          string
-		cmdName          string
-		description      string
-		version          string
-		compiled         time.Time
-		authors          []Author
-		copyright        string
-		middlewares      []Middleware
-		notFound         HandlerFunc
-		actions          map[string]*Action
-		sortedActions    []*Action
-		usageText        string
-		defaultValidator ValidateFunc
-		usageTemplate    *template.Template
-		lock             sync.RWMutex
+		*Command
+		appName       string
+		version       string
+		compiled      time.Time
+		authors       []Author
+		copyright     string
+		notFound      ActionFunc
+		usageText     string
+		usageTemplate *template.Template
+		validator     ValidateFunc
+		lock          sync.RWMutex
+	}
+	// Command a command object
+	Command struct {
+		app               *App
+		parent            *Command
+		cmdName           string
+		description       string
+		filters           []*filterObject
+		action            *actionObject
+		subcommands       map[string]*Command
+		sortedSubCommands []*Command
+		usageBody         string
+		usageText         string
+		lock              sync.RWMutex
 	}
 	// ValidateFunc validator for struct flag
 	ValidateFunc func(interface{}) error
-	// Author represents someone who has contributed to a cli project.
-	Author struct {
-		Name  string // The Authors name
-		Email string // The Authors email
-	}
-	// Action a command action
-	Action struct {
-		flagSet        *FlagSet
-		description    string
-		usageBody      string
-		usageText      string
-		handlerFactory DeepCopier
-		handlerFunc    HandlerFunc
-		validateFunc   func(interface{}) error
-		options        map[string]*Flag
-	}
-	// Handler handler of action
-	Handler interface {
+	// Action action of action
+	Action interface {
 		// Handle handles arguments.
 		// NOTE:
 		//  If need to return an error, use *Context.ThrowStatus or *Context.CheckStatus
 		Handle(*Context)
 	}
-	// DeepCopier an interface that can create its own copy
-	DeepCopier interface {
-		DeepCopy() Handler
+	// ActionCopier an interface that can create its own copy
+	ActionCopier interface {
+		DeepCopy() Action
 	}
-	// HandlerFunc handler function
+	// FilterCopier an interface that can create its own copy
+	FilterCopier interface {
+		DeepCopy() Filter
+	}
+	// ActionFunc action function
 	// NOTE:
 	//  If need to return an error, use *Context.ThrowStatus or *Context.CheckStatus
-	HandlerFunc func(*Context)
-	// Middleware middleware of an action execution
+	ActionFunc func(*Context)
+	// Filter global options of app
 	// NOTE:
 	//  If need to return an error, use *Context.ThrowStatus or *Context.CheckStatus
-	Middleware func(c *Context, next HandlerFunc)
+	Filter interface {
+		Filter(c *Context, next ActionFunc)
+	}
+	// FilterFunc filter function
+	// NOTE:
+	//  If need to return an error, use *Context.ThrowStatus or *Context.CheckStatus
+	FilterFunc func(c *Context, next ActionFunc)
 	// Context context of an action execution
 	Context struct {
 		context.Context
-		argsGroup []*ArgsInfo
+		args []string
 	}
-	// ArgsInfo command and options
-	ArgsInfo struct {
-		Command string
-		Options []string
+	// Author represents someone who has contributed to a cli project.
+	Author struct {
+		Name  string // The Authors name
+		Email string // The Authors email
 	}
 	// Status a handling status with code, msg, cause and stack.
-	Status     = status.Status
-	contextKey int8
+	Status = status.Status
+)
 
-	handlerFactory struct {
+type (
+	contextKey    int8
+	actionFactory struct {
 		elemType reflect.Type
+	}
+	factory      actionFactory
+	actionObject struct {
+		cmd           *Command
+		flagSet       *FlagSet
+		options       map[string]*Flag
+		actionFactory ActionCopier
+		actionFunc    ActionFunc
+	}
+	filterObject struct {
+		flagSet    *FlagSet
+		options    map[string]*Flag
+		factory    FilterCopier
+		filterFunc FilterFunc
 	}
 )
 
@@ -158,12 +176,22 @@ func NewApp() *App {
 }
 
 func (a *App) init() *App {
+	a.Command = newCommand(a, "", "")
 	a.SetCmdName("")
 	a.SetName("")
 	a.SetVersion("")
 	a.SetCompiled(time.Time{})
 	a.SetUsageTemplate(defaultAppUsageTemplate)
 	return a
+}
+
+func newCommand(app *App, cmdName, description string) *Command {
+	return &Command{
+		app:         app,
+		cmdName:     cmdName,
+		description: description,
+		subcommands: make(map[string]*Command, 16),
+	}
 }
 
 // CmdName returns the command name of the application.
@@ -294,85 +322,158 @@ func (a *App) SetCopyright(copyright string) {
 	a.updateUsageLocked()
 }
 
-// Use uses a middleware.
-func (a *App) Use(mw Middleware) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	a.middlewares = append(a.middlewares, mw)
-}
-
-// Handle implements Handler interface.
-func (fn HandlerFunc) Handle(c *Context) {
+// Handle implements Action interface.
+func (fn ActionFunc) Handle(c *Context) {
 	fn(c)
 }
 
-// MustSetOptions sets the global options actions.
-// NOTE:
-//  panic when something goes wrong;
-//  if handler is a struct, it can implement the copier interface.
-func (a *App) MustSetOptions(handler Handler) {
-	err := a.SetOptions(handler)
-	if err != nil {
-		panic(err)
-	}
+// Filter implements Filter interface.
+func (fn FilterFunc) Filter(c *Context, next ActionFunc) {
+	fn(c, next)
 }
 
-// SetOptions sets the global options.
-// NOTE:
-//  if handler is a struct, it can implement the copier interface.
-func (a *App) SetOptions(handler Handler, validator ...ValidateFunc) error {
-	return a.regAction("", "", handler, validator)
-}
-
-// MustAddAction adds an action.
-// NOTE:
-//  panic when something goes wrong;
-//  if handler is a struct, it can implement the copier interface.
-func (a *App) MustAddAction(cmdName, desc string, handler Handler, validator ...ValidateFunc) {
-	err := a.AddAction(cmdName, desc, handler, validator...)
-	if err != nil {
-		panic(err)
-	}
-}
-
-// AddAction adds an action.
-// NOTE:
-//  if handler is a struct, it can implement the copier interface.
-func (a *App) AddAction(cmdName, desc string, handler Handler, validator ...ValidateFunc) error {
-	if cmdName == "" {
-		return errors.New("action name can not be empty")
-	}
-	return a.regAction(cmdName, desc, handler, validator)
-}
-
-func (a *App) regAction(cmdName, desc string, handler Handler, validator []ValidateFunc) error {
+// SetValidator sets the validation function.
+func (a *App) SetValidator(validator ValidateFunc) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	if a.actions[cmdName] != nil {
-		return fmt.Errorf("an action named %s already exists", cmdName)
-	}
-
-	action, err := newAction(cmdName, desc, handler, append(validator, a.defaultValidator)[0])
-	if err != nil {
-		return err
-	}
-	if a.actions == nil {
-		a.actions = make(map[string]*Action)
-	}
-	a.actions[cmdName] = action
-	a.updateUsageLocked()
-	return nil
+	a.validator = validator
 }
 
-// Actions returns the sorted list of all actions.
-func (a *App) Actions() []*Action {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-	return a.sortedActions
+// AddSubaction adds a subcommand and its action.
+// NOTE:
+//  panic when something goes wrong
+func (c *Command) AddSubaction(cmdName, description string, action Action, filters ...Filter) {
+	c.AddSubcommand(cmdName, description, filters...).SetAction(action)
 }
 
-// SetNotFound sets the handler when the correct command cannot be found.
-func (a *App) SetNotFound(fn HandlerFunc) {
+// AddSubcommand adds a subcommand.
+// NOTE:
+//  panic when something goes wrong
+func (c *Command) AddSubcommand(cmdName, description string, filters ...Filter) *Command {
+	if c.action != nil {
+		panic(fmt.Errorf("action has been set, no subcommand can be set: %q", c.pathString()))
+	}
+	if cmdName == "" {
+		panic("command name is empty")
+	}
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.subcommands[cmdName] != nil {
+		panic(fmt.Errorf("action named %s already exists", cmdName))
+	}
+	subCmd := newCommand(c.app, cmdName, description)
+	subCmd.parent = c
+	for _, filter := range filters {
+		subCmd.AddFilter(filter)
+	}
+	c.subcommands[cmdName] = subCmd
+	return subCmd
+}
+
+// AddFilter adds the filter action.
+// NOTE:
+//  if filter is a struct, it can implement the copier interface;
+//  panic when something goes wrong
+func (c *Command) AddFilter(filter Filter) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	var obj filterObject
+	obj.flagSet = NewFlagSet(c.cmdName, ContinueOnError|ContinueOnUndefined)
+
+	elemType := ameda.DereferenceType(reflect.TypeOf(filter))
+	switch elemType.Kind() {
+	case reflect.Struct:
+		var ok bool
+		obj.factory, ok = filter.(FilterCopier)
+		if !ok {
+			obj.factory = &factory{elemType: elemType}
+		}
+		err := obj.flagSet.StructVars(obj.factory.DeepCopy())
+		if err != nil {
+			panic(err)
+		}
+		obj.flagSet.VisitAll(func(f *Flag) {
+			if obj.options == nil {
+				obj.options = make(map[string]*Flag)
+			}
+			obj.options[f.Name] = f
+		})
+	case reflect.Func:
+		obj.filterFunc = filter.Filter
+	}
+
+	c.app.updateUsageLocked()
+	c.filters = append(c.filters, &obj)
+}
+
+// SetAction sets the action of the command.
+// NOTE:
+//  if action is a struct, it can implement the copier interface;
+//  panic when something goes wrong.
+func (c *Command) SetAction(action Action) {
+	if len(c.subcommands) > 0 {
+		panic(fmt.Errorf("some subcommands have been set, no action can be set: %q", c.pathString()))
+	}
+	var obj actionObject
+	obj.cmd = c
+	obj.flagSet = NewFlagSet(c.cmdName, ContinueOnError|ContinueOnUndefined)
+
+	elemType := ameda.DereferenceType(reflect.TypeOf(action))
+	switch elemType.Kind() {
+	case reflect.Struct:
+		var ok bool
+		obj.actionFactory, ok = action.(ActionCopier)
+		if !ok {
+			obj.actionFactory = &actionFactory{elemType: elemType}
+		}
+		err := obj.flagSet.StructVars(obj.actionFactory.DeepCopy())
+		if err != nil {
+			panic(err)
+		}
+		obj.flagSet.VisitAll(func(f *Flag) {
+			if obj.options == nil {
+				obj.options = make(map[string]*Flag)
+			}
+			obj.options[f.Name] = f
+		})
+	case reflect.Func:
+		obj.actionFunc = action.Handle
+	}
+
+	// initialize usage
+	var buf bytes.Buffer
+	obj.flagSet.SetOutput(&buf)
+	obj.flagSet.PrintDefaults()
+	c.usageBody = buf.String()
+	if c.cmdName != "" { // non-global command
+		c.usageText += fmt.Sprintf("%s # %s\n", c.cmdName, c.description)
+	} else {
+		c.usageBody = strings.Replace(c.usageBody, "  -", "-", -1)
+		c.usageBody = strings.Replace(c.usageBody, "\n    \t", "\n  \t", -1)
+	}
+	c.usageText += c.usageBody
+	obj.flagSet.SetOutput(ioutil.Discard)
+	c.action = &obj
+	c.app.updateUsageLocked()
+}
+
+func (c *Command) path() (p []string) {
+	for {
+		if c.parent == nil {
+			p = append(p, c.cmdName)
+			ameda.NewStringSlice(p).Reverse()
+			return
+		}
+		p = append(p, c.cmdName, c.parent.cmdName)
+	}
+}
+
+func (c *Command) pathString() string {
+	return strings.Join(c.path(), " ")
+}
+
+// SetNotFound sets the action when the correct command cannot be found.
+func (a *App) SetNotFound(fn ActionFunc) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.notFound = fn
@@ -382,7 +483,7 @@ func (a *App) SetNotFound(fn HandlerFunc) {
 func (a *App) SetDefaultValidator(fn ValidateFunc) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	a.defaultValidator = fn
+	a.validator = fn
 }
 
 // SetUsageTemplate sets usage template.
@@ -400,48 +501,98 @@ func (a *App) Exec(ctx context.Context, arguments []string) (stat *Status) {
 	return
 }
 
-func (a *App) route(ctx context.Context, arguments []string) (HandlerFunc, *Context) {
+func (a *App) route(ctx context.Context, arguments []string) (ActionFunc, *Context) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	argsGroup, err := pickArgsInfo(arguments)
-	status.Check(err, StatusBadArgs, "bad arguments")
-	var ctxObj = &Context{argsGroup: argsGroup, Context: ctx}
-	var actions = make([]*Action, 0, 2)
-	var handlerFunc func(c *Context)
+	filters, action, found := a.Command.findFiltersAndAction([]string{a.cmdName}, arguments)
+	actionFunc := action.Handle
+	if found {
+		for i := len(filters) - 1; i >= 0; i-- {
+			filter := filters[i]
+			nextHandle := actionFunc
+			actionFunc = func(c *Context) {
+				filter.Filter(c, nextHandle)
+			}
+		}
+	}
+	return actionFunc, &Context{args: arguments, Context: ctx}
+}
 
-	for _, argsInfo := range argsGroup {
-		cmdName := argsInfo.Command
-		action := a.actions[cmdName]
-		if action == nil {
-			if a.notFound != nil {
-				// middleware is still executed
-				handlerFunc = func(c *Context) {
-					a.notFound(c.new(cmdName))
-				}
-				break
-			}
-			if cmdName == "" {
-				status.Throw(StatusNotFound, "not support global options", nil)
-			}
-			status.Throw(StatusNotFound, fmt.Sprintf("subcommand %q is not defined", cmdName), nil)
-		}
-		actions = append(actions, action)
+func (c *Command) findFiltersAndAction(cmdNamePath, arguments []string) ([]Filter, Action, bool) {
+	filters, arguments := c.newFilters(arguments)
+	action, arguments, found := c.newAction(arguments)
+	if found {
+		return filters, action, true
 	}
-	if handlerFunc == nil {
-		handlerFunc = func(c *Context) {
-			for _, action := range actions {
-				action.handle(c)
+
+	subCmdName, arguments := SplitArgs(arguments)
+	subCmd := c.subcommands[subCmdName]
+	cmdNamePath = append(cmdNamePath, subCmdName)
+	if subCmd == nil {
+		if c.app.notFound != nil {
+			return nil, c.app.notFound, false
+		}
+		ThrowStatus(
+			StatusNotFound,
+			"",
+			fmt.Sprintf("not found command action: %q", strings.Join(cmdNamePath, " ")),
+		)
+		return nil, nil, false
+	}
+	subFilters, action, found := subCmd.findFiltersAndAction(cmdNamePath, arguments)
+	if found {
+		filters = append(filters, subFilters...)
+		return filters, action, true
+	}
+	return nil, action, false
+}
+
+func (c *Command) newFilters(arguments []string) (r []Filter, args []string) {
+	r = make([]Filter, len(c.filters))
+	args = arguments
+	for i, filter := range c.filters {
+		if filter.filterFunc != nil {
+			r[i] = filter.filterFunc
+		} else {
+			flagSet := NewFlagSet(c.cmdName, filter.flagSet.ErrorHandling())
+			newObj := filter.factory.DeepCopy()
+			flagSet.StructVars(newObj)
+			err := flagSet.Parse(arguments)
+			CheckStatus(err, StatusParseFailed, "")
+			if c.app.validator != nil {
+				err = c.app.validator(newObj)
+			}
+			CheckStatus(err, StatusValidateFailed, "")
+			r[i] = newObj
+			nargs := flagSet.NextArgs()
+			if len(args) > len(nargs) {
+				args = nargs
 			}
 		}
 	}
-	for i := len(a.middlewares) - 1; i >= 0; i-- {
-		middleware := a.middlewares[i]
-		nextHandle := handlerFunc
-		handlerFunc = func(c *Context) {
-			middleware(c, nextHandle)
-		}
+	return r, args
+}
+
+func (c *Command) newAction(cmdline []string) (Action, []string, bool) {
+	a := c.action
+	if a == nil {
+		return nil, cmdline, false
 	}
-	return handlerFunc, ctxObj
+	cmdName := a.flagSet.Name()
+	if a.actionFunc != nil {
+		_, cmdline = SplitArgs(cmdline)
+		return a.actionFunc, cmdline, true
+	}
+	flagSet := NewFlagSet(cmdName, a.flagSet.ErrorHandling())
+	newObj := a.actionFactory.DeepCopy()
+	flagSet.StructVars(newObj)
+	err := flagSet.Parse(cmdline)
+	CheckStatus(err, StatusParseFailed, "")
+	if a.cmd.app.validator != nil {
+		err = a.cmd.app.validator(newObj)
+	}
+	CheckStatus(err, StatusValidateFailed, "")
+	return newObj.(Action), flagSet.NextArgs(), true
 }
 
 // UsageText returns the usage text.
@@ -454,140 +605,38 @@ func (a *App) UsageText() string {
 	return a.usageText
 }
 
-func (h *handlerFactory) DeepCopy() Handler {
-	return reflect.New(h.elemType).Interface().(Handler)
+func (h *actionFactory) DeepCopy() Action {
+	return reflect.New(h.elemType).Interface().(Action)
 }
 
-func newAction(cmdName, desc string, handler Handler, validateFunc func(interface{}) error) (*Action, error) {
-	var action Action
-	action.validateFunc = validateFunc
-	action.description = desc
-	action.flagSet = NewFlagSet(cmdName, ContinueOnError|ContinueOnUndefined)
-
-	handlerElemType := ameda.DereferenceType(reflect.TypeOf(handler))
-	switch handlerElemType.Kind() {
-	case reflect.Struct:
-		var ok bool
-		action.handlerFactory, ok = handler.(DeepCopier)
-		if !ok {
-			action.handlerFactory = &handlerFactory{elemType: handlerElemType}
-		}
-		err := action.flagSet.StructVars(action.handlerFactory.DeepCopy())
-		if err != nil {
-			return nil, err
-		}
-		action.flagSet.VisitAll(func(f *Flag) {
-			if action.options == nil {
-				action.options = make(map[string]*Flag)
-			}
-			action.options[f.Name] = f
-		})
-	case reflect.Func:
-		action.handlerFunc = handler.Handle
-	}
-
-	// initializate usage
-	var buf bytes.Buffer
-	action.flagSet.SetOutput(&buf)
-	action.flagSet.PrintDefaults()
-	action.usageBody = buf.String()
-	if cmdName != "" { // non-global command
-		action.usageText += fmt.Sprintf("%s # %s\n", cmdName, desc)
-	} else {
-		action.usageBody = strings.Replace(action.usageBody, "  -", "-", -1)
-		action.usageBody = strings.Replace(action.usageBody, "\n    \t", "\n  \t", -1)
-	}
-	action.usageText += action.usageBody
-	action.flagSet.SetOutput(ioutil.Discard)
-	return &action, nil
+func (f *factory) DeepCopy() Filter {
+	return reflect.New(f.elemType).Interface().(Filter)
 }
 
 // UsageText returns the usage text.
-func (a *Action) UsageText(prefix ...string) string {
+func (c *Command) UsageText(prefix ...string) string {
 	if len(prefix) > 0 {
-		return strings.Replace(a.usageText, "\n", "\n"+prefix[0], -1)
+		return strings.Replace(c.usageText, "\n", "\n"+prefix[0], -1)
 	}
-	return a.usageText
+	return c.usageText
 }
 
-// CmdName returns the command name of the action.
-func (a *Action) CmdName() string {
-	return a.flagSet.Name()
+// CmdName returns the command name of the command.
+func (c *Command) CmdName() string {
+	return c.cmdName
 }
 
-// Options returns the formal flags.
-func (a *Action) Options() map[string]*Flag {
-	return a.options
-}
-
-// Description returns description the of the action.
-func (a *Action) Description() string {
-	return a.description
-}
-
-// Exec executes the action alone.
-func (a *Action) Exec(c context.Context, options []string) (stat *Status) {
-	defer status.Catch(&stat)
-	cmdName := a.flagSet.Name()
-	a.handle(newContext(c, cmdName, []*ArgsInfo{{Command: cmdName, Options: options}}))
-	return
-}
-
-func (a *Action) handle(c *Context) {
-	cmdName := a.flagSet.Name()
-	c = c.new(cmdName)
-	if a.handlerFunc != nil {
-		a.handlerFunc(c)
-		return
+// Filters returns the formal flags.
+func (c *Command) Filters() map[string]*Flag {
+	if c.action == nil {
+		return nil
 	}
-	flagSet := NewFlagSet(cmdName, a.flagSet.ErrorHandling())
-	newObj := a.handlerFactory.DeepCopy()
-	flagSet.StructVars(newObj)
-	err := flagSet.Parse(c.getOptions(cmdName))
-	c.CheckStatus(err, StatusParseFailed, "")
-	if a.validateFunc != nil {
-		err = a.validateFunc(newObj)
-	}
-	c.CheckStatus(err, StatusValidateFailed, "")
-	newObj.(Handler).Handle(c)
+	return c.action.options
 }
 
-func newContext(ctx context.Context, cmdName string, argsGroup []*ArgsInfo) *Context {
-	return &Context{
-		Context:   context.WithValue(ctx, currCmdName, cmdName),
-		argsGroup: argsGroup,
-	}
-}
-
-func (c *Context) new(cmdName string) *Context {
-	return newContext(c.Context, cmdName, c.argsGroup)
-}
-
-// CmdName returns the command name.
-// NOTE:
-//  global command name is ""
-func (c *Context) CmdName() string {
-	cmdName, _ := c.Context.Value(currCmdName).(string)
-	return cmdName
-}
-
-// ArgsInfo returns the current command and options.
-// NOTE:
-//  global command name is ""
-func (c *Context) ArgsInfo() *ArgsInfo {
-	cmdName := c.CmdName()
-	options := ameda.StringsCopy(c.getOptions(cmdName))
-	return &ArgsInfo{Command: cmdName, Options: options}
-}
-
-func (c *Context) getOptions(cmdName string) (options []string) {
-	cmdName = c.CmdName()
-	for _, argsInfo := range c.argsGroup {
-		if argsInfo.Command == cmdName {
-			return argsInfo.Options
-		}
-	}
-	return nil
+// Args returns the command arguments.
+func (c *Context) Args() []string {
+	return c.args
 }
 
 // ThrowStatus creates a status with stack, and panic.
@@ -617,36 +666,6 @@ func (a Author) String() string {
 	return fmt.Sprintf("%v%v", a.Name, e)
 }
 
-func pickArgsInfo(arguments []string) (r []*ArgsInfo, err error) {
-	cmd, args := SplitArgs(arguments)
-	tidiedArgs, args, hasSubcommand, err := tidyArgs(args, func(string) (want bool, next bool) {
-		return true, true
-	})
-	if err != nil {
-		return
-	}
-	if hasSubcommand {
-		r = append(r, &ArgsInfo{Command: cmd, Options: tidiedArgs})
-	} else {
-		r = append(r, &ArgsInfo{Command: cmd, Options: append(tidiedArgs, args...)})
-	}
-	if !hasSubcommand || len(args) == 0 {
-		return
-	}
-	cmd, args = SplitArgs(args)
-	if cmd == "" {
-		return r, errors.New("subcommand is empty")
-	}
-	tidiedArgs, args, _, err = tidyArgs(args, func(string) (want bool, next bool) {
-		return true, true
-	})
-	if err != nil {
-		return
-	}
-	r = append(r, &ArgsInfo{Command: cmd, Options: tidiedArgs})
-	return
-}
-
 // defaultAppUsageTemplate is the text template for the Default help topic.
 var defaultAppUsageTemplate = template.Must(template.New("appUsage").
 	Funcs(template.FuncMap{"join": strings.Join}).
@@ -655,13 +674,13 @@ var defaultAppUsageTemplate = template.Must(template.New("appUsage").
 {{.Description}}{{end}}
 
 USAGE:
-  {{.CmdName}}{{if .Options}} [-globaloptions --]{{end}}{{if len .Commands}} [command] [-commandoptions]
+  {{.CmdName}}{{if .Filters}} [-globaloptions --]{{end}}{{if len .Commands}} [command] [-commandoptions]
 
 COMMANDS:{{range .Commands}}
-{{$.CmdName}} {{.UsageText}}{{end}}{{end}}{{if .Options}}
+{{$.CmdName}} {{.UsageText}}{{end}}{{end}}{{if .Filters}}
 
 GLOBAL OPTIONS:
-{{.Options.UsageText}}{{end}}{{if len .Authors}}
+{{.Filters.UsageText}}{{end}}{{if len .Authors}}
 
 AUTHOR{{with $length := len .Authors}}{{if ne 1 $length}}S{{end}}{{end}}:
 {{range $index, $author := .Authors}}{{if $index}}
@@ -672,49 +691,49 @@ COPYRIGHT:
 `))
 
 func (a *App) updateUsageLocked() {
-	if a.usageTemplate == nil {
-		a.usageText = ""
-		return
-	}
-	var data = map[string]interface{}{
-		"AppName":     a.appName,
-		"CmdName":     a.cmdName,
-		"Version":     a.version,
-		"Description": a.description,
-		"Authors":     a.authors,
-		"Commands":    []*Action{},
-		"Copyright":   a.copyright,
-	}
-	if len(a.actions) > 0 {
-		nameList := make([]string, 0, len(a.actions))
-		a.sortedActions = make([]*Action, 0, len(a.actions))
-		for name := range a.actions {
-			nameList = append(nameList, name)
-		}
-		sort.Strings(nameList)
-		if nameList[0] == "" {
-			g := a.actions[nameList[0]]
-			if len(g.Options()) > 0 {
-				data["Options"] = g
-			}
-			nameList = nameList[1:]
-			a.sortedActions = append(a.sortedActions, g)
-		}
-		if len(nameList) > 0 {
-			actions := make([]*Action, 0, len(nameList))
-			for _, name := range nameList {
-				g := a.actions[name]
-				actions = append(actions, g)
-				a.sortedActions = append(a.sortedActions, g)
-			}
-			data["Commands"] = actions
-		}
-	}
-
-	var buf bytes.Buffer
-	err := a.usageTemplate.Execute(&buf, data)
-	if err != nil {
-		panic(err)
-	}
-	a.usageText = strings.Replace(buf.String(), "\n\n\n", "\n\n", -1)
+	// if a.usageTemplate == nil {
+	// 	a.usageText = ""
+	// 	return
+	// }
+	// var data = map[string]interface{}{
+	// 	"AppName":     a.appName,
+	// 	"CmdName":     a.cmdName,
+	// 	"Version":     a.version,
+	// 	"Description": a.description,
+	// 	"Authors":     a.authors,
+	// 	"Commands":    []*Action{},
+	// 	"Copyright":   a.copyright,
+	// }
+	// if len(a.actions) > 0 {
+	// 	nameList := make([]string, 0, len(a.actions))
+	// 	a.sortedSubCommands = make([]*Action, 0, len(a.actions))
+	// 	for name := range a.actions {
+	// 		nameList = append(nameList, name)
+	// 	}
+	// 	sort.Strings(nameList)
+	// 	if nameList[0] == "" {
+	// 		g := a.actions[nameList[0]]
+	// 		if len(g.Filters()) > 0 {
+	// 			data["Filters"] = g
+	// 		}
+	// 		nameList = nameList[1:]
+	// 		a.sortedSubCommands = append(a.sortedSubCommands, g)
+	// 	}
+	// 	if len(nameList) > 0 {
+	// 		actions := make([]*Action, 0, len(nameList))
+	// 		for _, name := range nameList {
+	// 			g := a.actions[name]
+	// 			actions = append(actions, g)
+	// 			a.sortedSubCommands = append(a.sortedSubCommands, g)
+	// 		}
+	// 		data["Commands"] = actions
+	// 	}
+	// }
+	//
+	// var buf bytes.Buffer
+	// err := a.usageTemplate.Execute(&buf, data)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// a.usageText = strings.Replace(buf.String(), "\n\n\n", "\n\n", -1)
 }
