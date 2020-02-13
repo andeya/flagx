@@ -106,8 +106,8 @@ func Args() []string {
 	return CommandLine.Args()
 }
 
-// SubArgs returns arguments of the next subcommand.
-func SubArgs() []string { return CommandLine.SubArgs() }
+// NextArgs returns arguments of the next subcommand.
+func NextArgs() []string { return CommandLine.NextArgs() }
 
 // Bool defines a bool flag with specified name, default value, and usage string.
 // The return value is the address of a bool variable that stores the value of the flag.
@@ -282,6 +282,11 @@ func NArg() int {
 // NFlag returns the number of command-line flags that have been set.
 func NFlag() int {
 	return CommandLine.NFlag()
+}
+
+// NFormalNonFlag returns the number of non-flag required in the definition.
+func NFormalNonFlag() int {
+	return CommandLine.NFormalNonFlag()
 }
 
 // Parse parses the command-line flags from os.Args[1:]. Must be called

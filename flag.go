@@ -84,17 +84,26 @@ func (f *FlagSet) ErrorHandling() ErrorHandling {
 	return f.errorHandling
 }
 
-// SubArgs returns arguments of the next subcommand.
-func (f *FlagSet) SubArgs() []string {
-	if f.terminated {
-		return f.Args()
-	}
+// NextArgs returns arguments of the next subcommand.
+func (f *FlagSet) NextArgs() []string {
+	n := f.NFormalNonFlag()
 	args := f.Args()
-	idx := ameda.NewStringSlice(args).IndexOf("--")
-	if idx >= 0 {
-		return args[idx+1:]
+	if n < len(args) {
+		return args[n:]
 	}
 	return nil
+}
+
+// NFormalNonFlag returns the number of non-flag required in the definition.
+func (f *FlagSet) NFormalNonFlag() int {
+	var max int
+	for i := range f.nonFormal {
+		n := i + 1
+		if max < n {
+			max = n
+		}
+	}
+	return max
 }
 
 // StructVars defines flags based on struct tags and binds to fields.
@@ -256,7 +265,6 @@ func (f *FlagSet) NonVar(value Value, index int, usage string) {
 // are defined and before flags are accessed by the program.
 // The return value will be ErrHelp if -help or -h were set but not defined.
 func (f *FlagSet) Parse(arguments []string) error {
-	_, arguments = SplitArgs(arguments)
 	if f.isContinueOnUndefined {
 		flagArgs, nonFlagArgs, terminated, err := tidyArgs(arguments, func(name string) (want, next bool) {
 			return f.FlagSet.Lookup(name) != nil, true
