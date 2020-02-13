@@ -708,6 +708,11 @@ func (c *Context) CheckStatus(err error, code int32, msg string, whenError ...fu
 	panic(status.New(code, msg, err).TagStack(1))
 }
 
+// ParentVisible returns the visibility in parent command usage.
+func (c *Command) ParentVisible() bool {
+	return c.parentUsageVisible
+}
+
 // SetParentVisible sets the visibility in parent command usage.
 func (c *Command) SetParentVisible(visible bool) {
 	c.parentUsageVisible = visible
