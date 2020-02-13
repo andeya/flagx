@@ -721,8 +721,7 @@ func (c *Command) SetParentVisible(visible bool) {
 // UsageText returns the usage text.
 func (c *Command) UsageText(prefix ...string) string {
 	if len(prefix) > 0 {
-		s := "\n" + prefix[0]
-		return strings.TrimSuffix(prefix[0]+strings.Replace(c.usageText, "\n", s, -1), s)
+		return indent(c.usageText, prefix[0])
 	}
 	return c.usageText
 }
