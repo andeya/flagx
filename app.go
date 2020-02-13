@@ -81,7 +81,8 @@ type (
 	// Context context of an action execution
 	Context struct {
 		context.Context
-		args []string
+		args    []string
+		cmdPath []string
 	}
 	// Author represents someone who has contributed to a cli project.
 	Author struct {
@@ -401,9 +402,8 @@ func (c *Command) AddFilter(filter Filter) {
 	case reflect.Func:
 		obj.filterFunc = filter.Filter
 	}
-
-	c.app.updateUsageLocked()
 	c.filters = append(c.filters, &obj)
+	c.updateUsageLocked()
 }
 
 // SetAction sets the action of the command.
@@ -439,22 +439,8 @@ func (c *Command) SetAction(action Action) {
 	case reflect.Func:
 		obj.actionFunc = action.Handle
 	}
-
-	// initialize usage
-	var buf bytes.Buffer
-	obj.flagSet.SetOutput(&buf)
-	obj.flagSet.PrintDefaults()
-	c.usageBody = buf.String()
-	if c.cmdName != "" { // non-global command
-		c.usageText += fmt.Sprintf("%s # %s\n", c.cmdName, c.description)
-	} else {
-		c.usageBody = strings.Replace(c.usageBody, "  -", "-", -1)
-		c.usageBody = strings.Replace(c.usageBody, "\n    \t", "\n  \t", -1)
-	}
-	c.usageText += c.usageBody
-	obj.flagSet.SetOutput(ioutil.Discard)
 	c.action = &obj
-	c.app.updateUsageLocked()
+	c.updateUsageLocked()
 }
 
 func (c *Command) path() (p []string) {
@@ -504,9 +490,10 @@ func (a *App) Exec(ctx context.Context, arguments []string) (stat *Status) {
 func (a *App) route(ctx context.Context, arguments []string) (ActionFunc, *Context) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	filters, action, found := a.Command.findFiltersAndAction([]string{a.cmdName}, arguments)
+	filters, action, cmdPath, found := a.Command.findFiltersAndAction([]string{a.cmdName}, arguments)
 	actionFunc := action.Handle
 	if found {
+
 		for i := len(filters) - 1; i >= 0; i-- {
 			filter := filters[i]
 			nextHandle := actionFunc
@@ -515,36 +502,37 @@ func (a *App) route(ctx context.Context, arguments []string) (ActionFunc, *Conte
 			}
 		}
 	}
-	return actionFunc, &Context{args: arguments, Context: ctx}
+	return actionFunc, &Context{args: arguments, cmdPath: cmdPath, Context: ctx}
 }
 
-func (c *Command) findFiltersAndAction(cmdNamePath, arguments []string) ([]Filter, Action, bool) {
+func (c *Command) findFiltersAndAction(cmdPath, arguments []string) ([]Filter, Action, []string, bool) {
 	filters, arguments := c.newFilters(arguments)
 	action, arguments, found := c.newAction(arguments)
 	if found {
-		return filters, action, true
+		return filters, action, cmdPath, true
 	}
-
 	subCmdName, arguments := SplitArgs(arguments)
 	subCmd := c.subcommands[subCmdName]
-	cmdNamePath = append(cmdNamePath, subCmdName)
+	if subCmdName != "" {
+		cmdPath = append(cmdPath, subCmdName)
+	}
 	if subCmd == nil {
 		if c.app.notFound != nil {
-			return nil, c.app.notFound, false
+			return nil, c.app.notFound, cmdPath, false
 		}
 		ThrowStatus(
 			StatusNotFound,
 			"",
-			fmt.Sprintf("not found command action: %q", strings.Join(cmdNamePath, " ")),
+			fmt.Sprintf("not found command action: %q", strings.Join(cmdPath, " ")),
 		)
-		return nil, nil, false
+		return nil, nil, cmdPath, false
 	}
-	subFilters, action, found := subCmd.findFiltersAndAction(cmdNamePath, arguments)
+	subFilters, action, cmdPath, found := subCmd.findFiltersAndAction(cmdPath, arguments)
 	if found {
 		filters = append(filters, subFilters...)
-		return filters, action, true
+		return filters, action, cmdPath, true
 	}
-	return nil, action, false
+	return nil, action, cmdPath, false
 }
 
 func (c *Command) newFilters(arguments []string) (r []Filter, args []string) {
@@ -639,6 +627,16 @@ func (c *Context) Args() []string {
 	return c.args
 }
 
+// CmdPath returns the command path slice.
+func (c *Context) CmdPath() []string {
+	return c.cmdPath
+}
+
+// CmdPathString returns the command path string.
+func (c *Context) CmdPathString() string {
+	return strings.Join(c.CmdPath(), " ")
+}
+
 // ThrowStatus creates a status with stack, and panic.
 func (c *Context) ThrowStatus(code int32, msg string, cause interface{}) {
 	panic(status.New(code, msg, cause).TagStack(1))
@@ -689,6 +687,24 @@ AUTHOR{{with $length := len .Authors}}{{if ne 1 $length}}S{{end}}{{end}}:
 COPYRIGHT:
   {{.Copyright}}{{end}}
 `))
+
+func (c *Command) updateUsageLocked() {
+	var buf bytes.Buffer
+	if c.action == nil {
+		return
+	}
+	c.action.flagSet.SetOutput(&buf)
+	c.action.flagSet.PrintDefaults()
+	c.usageBody = buf.String()
+	if c.cmdName != "" { // non-global command
+		c.usageText += fmt.Sprintf("%s # %s\n", c.cmdName, c.description)
+	} else {
+		c.usageBody = strings.Replace(c.usageBody, "  -", "-", -1)
+		c.usageBody = strings.Replace(c.usageBody, "\n    \t", "\n  \t", -1)
+	}
+	c.usageText += c.usageBody
+	c.action.flagSet.SetOutput(ioutil.Discard)
+}
 
 func (a *App) updateUsageLocked() {
 	// if a.usageTemplate == nil {

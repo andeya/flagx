@@ -138,10 +138,7 @@ func ExampleApp() {
 		b.AddSubaction("d", "subcommand d", flagx.ActionFunc(Action3))
 	}
 	app.SetNotFound(func(c *flagx.Context) {
-		fmt.Printf(
-			"NotFound: args=%+v\n",
-			c.Args(),
-		)
+		fmt.Printf("NotFound: args=%+v, path=%q\n", c.Args(), c.CmdPathString())
 	})
 
 	// test: testapp
@@ -177,19 +174,19 @@ func ExampleApp() {
 	}
 
 	// Output:
-	// NotFound: args=[-g=flagx false]
+	// NotFound: args=[-g=flagx false], path="testapp"
 	// Filter1 start: args=[-g=henry true a -id 1 ~/m/n], G=henry
-	// Action1: args=[-g=henry true a -id 1 ~/m/n], object=&{ID:1 Path:~/m/n}
+	// Action1: args=[-g=henry true a -id 1 ~/m/n], path="testapp a", object=&{ID:1 Path:~/m/n}
 	// Filter1 end: args=[-g=henry true a -id 1 ~/m/n]
-	// NotFound: args=[-g=flagx false b]
+	// NotFound: args=[-g=flagx false b], path="testapp b"
 	// Filter1 start: args=[-g=flagx false b c name=henry], V=false
 	// Filter2 start: args=[-g=flagx false b c name=henry], start at=2020-02-13 13:48:15 +0800 CST
-	// Action2: args=[-g=flagx false b c name=henry], object=&{Name:}
+	// Action2: args=[-g=flagx false b c name=henry], path="testapp b c", object=&{Name:}
 	// Filter2 end: args=[-g=flagx false b c name=henry], cost time=1µs
 	// Filter1 end: args=[-g=flagx false b c name=henry]
 	// Filter1 start: args=[-g=flagx false b d], V=false
 	// Filter2 start: args=[-g=flagx false b d], start at=2020-02-13 13:48:15 +0800 CST
-	// Action3: args=[-g=flagx false b d]
+	// Action3: args=[-g=flagx false b d], path="testapp b d"
 	// Filter2 end: args=[-g=flagx false b d], cost time=1µs
 	// Filter1 end: args=[-g=flagx false b d]
 }
@@ -230,7 +227,7 @@ type Action1 struct {
 }
 
 func (a *Action1) Handle(c *flagx.Context) {
-	fmt.Printf("Action1: args=%+v, object=%+v\n", c.Args(), a)
+	fmt.Printf("Action1: args=%+v, path=%q, object=%+v\n", c.Args(), c.CmdPathString(), a)
 }
 
 type Action2 struct {
@@ -238,10 +235,10 @@ type Action2 struct {
 }
 
 func (a *Action2) Handle(c *flagx.Context) {
-	fmt.Printf("Action2: args=%+v, object=%+v\n", c.Args(), a)
+	fmt.Printf("Action2: args=%+v, path=%q, object=%+v\n", c.Args(), c.CmdPathString(), a)
 }
 
 func Action3(c *flagx.Context) {
-	fmt.Printf("Action3: args=%+v\n", c.Args())
+	fmt.Printf("Action3: args=%+v, path=%q\n", c.Args(), c.CmdPathString())
 }
 ```
