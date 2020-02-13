@@ -82,6 +82,7 @@ type (
 		context.Context
 		args    []string
 		cmdPath []string
+		cmd     *Command
 	}
 	// Author represents someone who has contributed to a cli project.
 	Author struct {
@@ -351,7 +352,7 @@ func (c *Command) AddSubaction(cmdName, description string, action Action, filte
 //  panic when something goes wrong
 func (c *Command) AddSubcommand(cmdName, description string, filters ...Filter) *Command {
 	if c.action != nil {
-		panic(fmt.Errorf("action has been set, no subcommand can be set: %q", c.pathString()))
+		panic(fmt.Errorf("action has been set, no subcommand can be set: %q", c.PathString()))
 	}
 	if cmdName == "" {
 		panic("command name is empty")
@@ -411,7 +412,7 @@ func (c *Command) AddFilter(filter Filter) {
 //  panic when something goes wrong.
 func (c *Command) SetAction(action Action) {
 	if len(c.subcommands) > 0 {
-		panic(fmt.Errorf("some subcommands have been set, no action can be set: %q", c.pathString()))
+		panic(fmt.Errorf("some subcommands have been set, no action can be set: %q", c.PathString()))
 	}
 	var obj actionObject
 	obj.cmd = c
@@ -440,22 +441,6 @@ func (c *Command) SetAction(action Action) {
 	}
 	c.action = &obj
 	c.updateAllUsageLocked()
-}
-
-func (c *Command) path() (p []string) {
-	for {
-		if c.parent == nil {
-			p = append(p, c.cmdName)
-			ameda.NewStringSlice(p).Reverse()
-			return
-		}
-		p = append(p, c.cmdName)
-		c = c.parent
-	}
-}
-
-func (c *Command) pathString() string {
-	return strings.Join(c.path(), " ")
 }
 
 // SetNotFound sets the action when the correct command cannot be found.
@@ -490,10 +475,10 @@ func (a *App) Exec(ctx context.Context, arguments []string) (stat *Status) {
 func (a *App) route(ctx context.Context, arguments []string) (ActionFunc, *Context) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	filters, action, cmdPath, found := a.Command.findFiltersAndAction([]string{a.cmdName}, arguments)
+	filters, action, cmdPath, cmd, found := a.Command.findFiltersAndAction([]string{a.cmdName}, arguments)
 	actionFunc := action.Handle
+	c := &Context{args: arguments, cmdPath: cmdPath, Context: ctx, cmd: cmd}
 	if found {
-
 		for i := len(filters) - 1; i >= 0; i-- {
 			filter := filters[i]
 			nextHandle := actionFunc
@@ -502,14 +487,14 @@ func (a *App) route(ctx context.Context, arguments []string) (ActionFunc, *Conte
 			}
 		}
 	}
-	return actionFunc, &Context{args: arguments, cmdPath: cmdPath, Context: ctx}
+	return actionFunc, c
 }
 
-func (c *Command) findFiltersAndAction(cmdPath, arguments []string) ([]Filter, Action, []string, bool) {
+func (c *Command) findFiltersAndAction(cmdPath, arguments []string) ([]Filter, Action, []string, *Command, bool) {
 	filters, arguments := c.newFilters(arguments)
 	action, arguments, found := c.newAction(arguments)
 	if found {
-		return filters, action, cmdPath, true
+		return filters, action, cmdPath, c, true
 	}
 	subCmdName, arguments := SplitArgs(arguments)
 	subCmd := c.subcommands[subCmdName]
@@ -518,21 +503,21 @@ func (c *Command) findFiltersAndAction(cmdPath, arguments []string) ([]Filter, A
 	}
 	if subCmd == nil {
 		if c.app.notFound != nil {
-			return nil, c.app.notFound, cmdPath, false
+			return nil, c.app.notFound, cmdPath, c, false
 		}
 		ThrowStatus(
 			StatusNotFound,
 			"",
 			fmt.Sprintf("not found command action: %q", strings.Join(cmdPath, " ")),
 		)
-		return nil, nil, cmdPath, false
+		return nil, nil, cmdPath, c, false
 	}
-	subFilters, action, cmdPath, found := subCmd.findFiltersAndAction(cmdPath, arguments)
+	subFilters, action, cmdPath, subCmd2, found := subCmd.findFiltersAndAction(cmdPath, arguments)
 	if found {
 		filters = append(filters, subFilters...)
-		return filters, action, cmdPath, true
+		return filters, action, cmdPath, subCmd2, true
 	}
-	return nil, action, cmdPath, false
+	return nil, action, cmdPath, subCmd2, false
 }
 
 func (c *Command) newFilters(arguments []string) (r []Filter, args []string) {
@@ -601,6 +586,30 @@ func (f *factory) DeepCopy() Filter {
 	return reflect.New(f.elemType).Interface().(Filter)
 }
 
+// CmdName returns the command name of the command.
+func (c *Command) CmdName() string {
+	return c.cmdName
+}
+
+// Path returns the command path slice.
+func (c *Command) Path() (p []string) {
+	r := c
+	for {
+		if r.parent == nil {
+			p = append(p, r.cmdName)
+			ameda.NewStringSlice(p).Reverse()
+			return
+		}
+		p = append(p, r.cmdName)
+		r = r.parent
+	}
+}
+
+// PathString returns the command path string.
+func (c *Command) PathString() string {
+	return strings.Join(c.Path(), " ")
+}
+
 // UsageText returns the usage text.
 func (c *Command) UsageText(prefix ...string) string {
 	if len(prefix) > 0 {
@@ -609,9 +618,55 @@ func (c *Command) UsageText(prefix ...string) string {
 	return c.usageText
 }
 
-// CmdName returns the command name of the command.
-func (c *Command) CmdName() string {
-	return c.cmdName
+// Root returns the root command.
+// NOTE:
+//  returns nil if it does not exist.
+func (c *Command) Root() *Command {
+	r := c
+	for {
+		if r.parent == nil {
+			return r
+		}
+		r = r.parent
+	}
+}
+
+// Parent returns the parent command.
+// NOTE:
+//  returns nil if it does not exist.
+func (c *Command) Parent() *Command {
+	return c.parent
+}
+
+// LookupSubcommand lookups subcommand by path names.
+// NOTE:
+//  returns nil if it does not exist.
+func (c *Command) LookupSubcommand(pathCmdNames ...string) *Command {
+	r := c
+	for _, name := range pathCmdNames {
+		if name == "" {
+			continue
+		}
+		r = r.subcommands[name]
+		if r == nil {
+			return nil
+		}
+	}
+	return r
+}
+
+// Subcommands returns the subcommands.
+func (c *Command) Subcommands() []*Command {
+	names := make([]string, 0, len(c.subcommands))
+	for name := range c.subcommands {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	cmds := make([]*Command, len(names))
+	for i, name := range names {
+		cmds[i] = c.subcommands[name]
+	}
+	return cmds
 }
 
 // Filters returns the formal flags.
@@ -635,6 +690,11 @@ func (c *Context) CmdPath() []string {
 // CmdPathString returns the command path string.
 func (c *Context) CmdPathString() string {
 	return strings.Join(c.CmdPath(), " ")
+}
+
+// UsageText returns the command usage.
+func (c *Context) UsageText(prefix ...string) string {
+	return c.cmd.UsageText(prefix...)
 }
 
 // ThrowStatus creates a status with stack, and panic.
@@ -703,22 +763,9 @@ func (c *Command) updateAllUsageLocked() {
 	a.usageText = strings.Replace(buf.String(), "\n\n\n", "\n\n", -1)
 }
 
-func (c *Command) sortedSubcommands() []*Command {
-	names := make([]string, 0, len(c.subcommands))
-	for name := range c.subcommands {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	cmds := make([]*Command, len(names))
-	for i, name := range names {
-		cmds[i] = c.subcommands[name]
-	}
-	return cmds
-}
-
 func (c *Command) updateUsageLocked() {
 	c.usageText, c.usageBody = c.newUsageLocked()
-	subcommands := c.sortedSubcommands()
+	subcommands := c.Subcommands()
 	for _, subCmd := range subcommands {
 		subCmd.updateUsageLocked()
 		c.usageText += subCmd.usageText
@@ -748,7 +795,7 @@ func (c *Command) newUsageLocked() (text string, body string) {
 		if c.action == nil {
 			ellipsis = " ..."
 		}
-		text = fmt.Sprintf("$%s%s\n  %s\n", c.pathString(), ellipsis, c.description)
+		text = fmt.Sprintf("$%s%s\n  %s\n", c.PathString(), ellipsis, c.description)
 	} else {
 		body = strings.Replace(body, "  -?", "?", -1)
 		body = strings.Replace(body, "  -", "-", -1)

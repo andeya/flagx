@@ -3,9 +3,11 @@ package flagx_test
 import (
 	"context"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/henrylee2cn/flagx"
+	"github.com/stretchr/testify/assert"
 )
 
 func ExampleApp() {
@@ -159,4 +161,39 @@ func (a *Action2) Handle(c *flagx.Context) {
 
 func Action3(c *flagx.Context) {
 	fmt.Printf("Action3: args=%+v, path=%q\n", c.Args(), c.CmdPathString())
+}
+
+func TestCommand(t *testing.T) {
+	app := flagx.NewApp()
+	app.SetCmdName("testapp")
+	app.AddSubaction("a", "subcommand a", new(Action1))
+	b := app.AddSubcommand("b", "subcommand b", flagx.FilterFunc(Filter2))
+	{
+		b.AddSubaction("c", "subcommand c", new(Action2))
+		b.AddSubaction("d", "subcommand d", flagx.ActionFunc(Action3))
+	}
+	app.SetNotFound(func(c *flagx.Context) {
+		fmt.Printf("NotFound: args=%+v, path=%q\n", c.Args(), c.CmdPathString())
+	})
+	assert.NotNil(t, app.LookupSubcommand("a"))
+	assert.NotNil(t, app.LookupSubcommand("b"))
+	assert.NotNil(t, app.LookupSubcommand("b", "c"))
+	assert.NotNil(t, app.LookupSubcommand("b", "d"))
+	assert.Nil(t, app.LookupSubcommand("b", "d", "x"))
+	assert.Nil(t, app.LookupSubcommand("x"))
+
+	assert.Equal(t, "testapp", app.Root().CmdName())
+	assert.Equal(t, "testapp", app.LookupSubcommand("b", "d").Root().CmdName())
+	assert.Equal(
+		t,
+		"$testapp b ...\n"+
+			"  subcommand b\n"+
+			"$testapp b c\n"+
+			"  subcommand c\n"+
+			"  -name string\n"+
+			"    \tparam name\n"+
+			"$testapp b d\n"+
+			"  subcommand d\n",
+		app.LookupSubcommand("b").UsageText(),
+	)
 }
