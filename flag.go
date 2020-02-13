@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -371,6 +372,29 @@ func (f *FlagSet) defaultUsage() {
 		fmt.Fprintf(f.Output(), "Usage of %s:\n", f.Name())
 	}
 	f.PrintDefaults()
+}
+
+// NonVisitAll visits the non-flags in lexicographical order, calling fn for each.
+// It visits all flags, even those not set.
+func (f *FlagSet) NonVisitAll(fn func(*Flag)) {
+	f.visitNonFlags(f.nonFormal, fn)
+}
+
+func (f *FlagSet) visitNonFlags(flags map[int]*Flag, fn func(*Flag)) {
+	a := make([]int, 0, len(flags))
+	for k := range flags {
+		a = append(a, k)
+	}
+	sort.Ints(a)
+	for _, k := range a {
+		fn(flags[k])
+	}
+}
+
+// NonVisit visits the non-flags in lexicographical order, calling fn for each.
+// It visits only those non-flags that have been set.
+func (f *FlagSet) NonVisit(fn func(*Flag)) {
+	f.visitNonFlags(f.nonActual, fn)
 }
 
 func tidyArgs(args []string, filter func(name string) (want, next bool)) (tidiedArgs, lastArgs []string, terminated bool, err error) {

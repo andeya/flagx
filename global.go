@@ -418,3 +418,15 @@ func Visit(fn func(*Flag)) {
 func VisitAll(fn func(*Flag)) {
 	CommandLine.VisitAll(fn)
 }
+
+// NonVisitAll visits the command-line non-flags in lexicographical order, calling
+// fn for each. It visits all non-flags, even those not set.
+func NonVisitAll(fn func(*Flag)) {
+	CommandLine.NonVisitAll(fn)
+}
+
+// NonVisit visits the command-line non-flags in lexicographical order, calling fn
+// for each. It visits only those non-flags that have been set.
+func NonVisit(fn func(*Flag)) {
+	CommandLine.NonVisit(fn)
+}
