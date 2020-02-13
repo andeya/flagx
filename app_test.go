@@ -31,6 +31,8 @@ func ExampleApp() {
 		fmt.Printf("NotFound: args=%+v, path=%q\n", c.Args(), c.CmdPathString())
 	})
 
+	fmt.Println(app.UsageText())
+
 	// test: testapp
 	// not found
 	stat := app.Exec(context.TODO(), []string{"-g=flagx", "false"})
@@ -64,6 +66,33 @@ func ExampleApp() {
 	}
 
 	// Output:
+	// testapp - v0.0.1
+	//
+	// this is a app for testing
+	//
+	// USAGE:
+	//   -g string
+	//   	global param g
+	// ?0 bool
+	//   	param view
+	// $testapp a
+	//   subcommand a
+	//   -id int
+	//     	param id
+	//   -?0 string
+	//     	param path
+	// $testapp b
+	//   subcommand b
+	// $testapp b c
+	//   subcommand c
+	//   -name string
+	//     	param name
+	// $testapp b d
+	//   subcommand d
+	//
+	// AUTHOR:
+	//   henrylee2cn <henrylee2cn@gmail.com>
+	//
 	// NotFound: args=[-g=flagx false], path="testapp"
 	// Filter1 start: args=[-g=henry true a -id 1 ~/m/n], G=henry
 	// Action1: args=[-g=henry true a -id 1 ~/m/n], path="testapp a", object=&{ID:1 Path:~/m/n}

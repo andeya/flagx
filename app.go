@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"text/template"
@@ -28,24 +28,22 @@ type (
 		authors       []Author
 		copyright     string
 		notFound      ActionFunc
-		usageText     string
 		usageTemplate *template.Template
 		validator     ValidateFunc
 		lock          sync.RWMutex
 	}
 	// Command a command object
 	Command struct {
-		app               *App
-		parent            *Command
-		cmdName           string
-		description       string
-		filters           []*filterObject
-		action            *actionObject
-		subcommands       map[string]*Command
-		sortedSubCommands []*Command
-		usageBody         string
-		usageText         string
-		lock              sync.RWMutex
+		app         *App
+		parent      *Command
+		cmdName     string
+		description string
+		filters     []*filterObject
+		action      *actionObject
+		subcommands map[string]*Command
+		usageBody   string
+		usageText   string
+		lock        sync.RWMutex
 	}
 	// ValidateFunc validator for struct flag
 	ValidateFunc func(interface{}) error
@@ -177,12 +175,12 @@ func NewApp() *App {
 }
 
 func (a *App) init() *App {
+	a.SetUsageTemplate(defaultAppUsageTemplate)
 	a.Command = newCommand(a, "", "")
 	a.SetCmdName("")
 	a.SetName("")
 	a.SetVersion("")
 	a.SetCompiled(time.Time{})
-	a.SetUsageTemplate(defaultAppUsageTemplate)
 	return a
 }
 
@@ -213,7 +211,7 @@ func (a *App) SetCmdName(cmdName string) {
 		cmdName = filepath.Base(os.Args[0])
 	}
 	a.cmdName = strings.TrimLeft(cmdName, "-")
-	a.updateUsageLocked()
+	a.updateAllUsageLocked()
 }
 
 // Name returns the name(title) of the application.
@@ -232,7 +230,7 @@ func (a *App) SetName(appName string) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.appName = appName
-	a.updateUsageLocked()
+	a.updateAllUsageLocked()
 }
 
 // Description returns description the of the application.
@@ -247,7 +245,7 @@ func (a *App) SetDescription(description string) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.description = description
-	a.updateUsageLocked()
+	a.updateAllUsageLocked()
 }
 
 // Version returns the version of the application.
@@ -267,7 +265,7 @@ func (a *App) SetVersion(version string) {
 		version = "0.0.1"
 	}
 	a.version = version
-	a.updateUsageLocked()
+	a.updateAllUsageLocked()
 }
 
 // Compiled returns the compilation date.
@@ -290,7 +288,7 @@ func (a *App) SetCompiled(date time.Time) {
 		}
 	}
 	a.compiled = date
-	a.updateUsageLocked()
+	a.updateAllUsageLocked()
 }
 
 // Authors returns the list of all authors who contributed.
@@ -305,7 +303,7 @@ func (a *App) SetAuthors(authors []Author) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.authors = authors
-	a.updateUsageLocked()
+	a.updateAllUsageLocked()
 }
 
 // Copyright returns the copyright of the binary if any.
@@ -320,7 +318,7 @@ func (a *App) SetCopyright(copyright string) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.copyright = copyright
-	a.updateUsageLocked()
+	a.updateAllUsageLocked()
 }
 
 // Handle implements Action interface.
@@ -403,7 +401,7 @@ func (c *Command) AddFilter(filter Filter) {
 		obj.filterFunc = filter.Filter
 	}
 	c.filters = append(c.filters, &obj)
-	c.updateUsageLocked()
+	c.updateAllUsageLocked()
 }
 
 // SetAction sets the action of the command.
@@ -440,7 +438,7 @@ func (c *Command) SetAction(action Action) {
 		obj.actionFunc = action.Handle
 	}
 	c.action = &obj
-	c.updateUsageLocked()
+	c.updateAllUsageLocked()
 }
 
 func (c *Command) path() (p []string) {
@@ -450,7 +448,8 @@ func (c *Command) path() (p []string) {
 			ameda.NewStringSlice(p).Reverse()
 			return
 		}
-		p = append(p, c.cmdName, c.parent.cmdName)
+		p = append(p, c.cmdName)
+		c = c.parent
 	}
 }
 
@@ -672,13 +671,7 @@ var defaultAppUsageTemplate = template.Must(template.New("appUsage").
 {{.Description}}{{end}}
 
 USAGE:
-  {{.CmdName}}{{if .Filters}} [-globaloptions --]{{end}}{{if len .Commands}} [command] [-commandoptions]
-
-COMMANDS:{{range .Commands}}
-{{$.CmdName}} {{.UsageText}}{{end}}{{end}}{{if .Filters}}
-
-GLOBAL OPTIONS:
-{{.Filters.UsageText}}{{end}}{{if len .Authors}}
+  {{.Usage}}{{if len .Authors}}
 
 AUTHOR{{with $length := len .Authors}}{{if ne 1 $length}}S{{end}}{{end}}:
 {{range $index, $author := .Authors}}{{if $index}}
@@ -688,68 +681,74 @@ COPYRIGHT:
   {{.Copyright}}{{end}}
 `))
 
-func (c *Command) updateUsageLocked() {
+func (c *Command) updateAllUsageLocked() {
+	a := c.app
+	a.Command.updateUsageLocked()
+	text := a.Command.usageText
+	data := map[string]interface{}{
+		"AppName":     a.appName,
+		"CmdName":     a.cmdName,
+		"Version":     a.version,
+		"Description": a.description,
+		"Authors":     a.authors,
+		"Usage":       text,
+		"Copyright":   a.copyright,
+	}
 	var buf bytes.Buffer
-	if c.action == nil {
-		return
+	err := a.usageTemplate.Execute(&buf, data)
+	if err != nil {
+		panic(err)
 	}
-	c.action.flagSet.SetOutput(&buf)
-	c.action.flagSet.PrintDefaults()
-	c.usageBody = buf.String()
-	if c.cmdName != "" { // non-global command
-		c.usageText += fmt.Sprintf("%s # %s\n", c.cmdName, c.description)
-	} else {
-		c.usageBody = strings.Replace(c.usageBody, "  -", "-", -1)
-		c.usageBody = strings.Replace(c.usageBody, "\n    \t", "\n  \t", -1)
-	}
-	c.usageText += c.usageBody
-	c.action.flagSet.SetOutput(ioutil.Discard)
+	a.Command.usageText = strings.Replace(buf.String(), "\n\n\n", "\n\n", -1)
 }
 
-func (a *App) updateUsageLocked() {
-	// if a.usageTemplate == nil {
-	// 	a.usageText = ""
-	// 	return
-	// }
-	// var data = map[string]interface{}{
-	// 	"AppName":     a.appName,
-	// 	"CmdName":     a.cmdName,
-	// 	"Version":     a.version,
-	// 	"Description": a.description,
-	// 	"Authors":     a.authors,
-	// 	"Commands":    []*Action{},
-	// 	"Copyright":   a.copyright,
-	// }
-	// if len(a.actions) > 0 {
-	// 	nameList := make([]string, 0, len(a.actions))
-	// 	a.sortedSubCommands = make([]*Action, 0, len(a.actions))
-	// 	for name := range a.actions {
-	// 		nameList = append(nameList, name)
-	// 	}
-	// 	sort.Strings(nameList)
-	// 	if nameList[0] == "" {
-	// 		g := a.actions[nameList[0]]
-	// 		if len(g.Filters()) > 0 {
-	// 			data["Filters"] = g
-	// 		}
-	// 		nameList = nameList[1:]
-	// 		a.sortedSubCommands = append(a.sortedSubCommands, g)
-	// 	}
-	// 	if len(nameList) > 0 {
-	// 		actions := make([]*Action, 0, len(nameList))
-	// 		for _, name := range nameList {
-	// 			g := a.actions[name]
-	// 			actions = append(actions, g)
-	// 			a.sortedSubCommands = append(a.sortedSubCommands, g)
-	// 		}
-	// 		data["Commands"] = actions
-	// 	}
-	// }
-	//
-	// var buf bytes.Buffer
-	// err := a.usageTemplate.Execute(&buf, data)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// a.usageText = strings.Replace(buf.String(), "\n\n\n", "\n\n", -1)
+func (c *Command) sortedSubcommands() []*Command {
+	names := make([]string, 0, len(c.subcommands))
+	for name := range c.subcommands {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	cmds := make([]*Command, len(names))
+	for i, name := range names {
+		cmds[i] = c.subcommands[name]
+	}
+	return cmds
+}
+
+func (c *Command) updateUsageLocked() {
+	c.usageText, c.usageBody = c.newUsageLocked()
+	subcommands := c.sortedSubcommands()
+	for _, subCmd := range subcommands {
+		subCmd.updateUsageLocked()
+		c.usageText += subCmd.usageText
+	}
+}
+
+func (c *Command) newUsageLocked() (text string, body string) {
+	var buf bytes.Buffer
+	flags := make([]*Flag, 0, len(c.filters)+1)
+	for _, filter := range c.filters {
+		filter.flagSet.RangeAll(func(f *Flag) {
+			flags = append(flags, f)
+		})
+	}
+	if c.action != nil {
+		c.action.flagSet.RangeAll(func(f *Flag) {
+			flags = append(flags, f)
+		})
+	}
+	fn := newPrintOneDefault(&buf, true)
+	for _, f := range flags {
+		fn(f)
+	}
+	body = buf.String()
+	if c.parent != nil { // non-global command
+		text = fmt.Sprintf("$%s\n  %s\n", c.pathString(), c.description)
+	} else {
+		body = strings.Replace(body, "  -?", "?", -1)
+		body = strings.Replace(body, "  -", "-", -1)
+		body = strings.Replace(body, "\n    \t", "\n  \t", -1)
+	}
+	text += body
+	return text, body
 }
