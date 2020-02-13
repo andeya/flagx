@@ -189,7 +189,7 @@ func ExampleApp() {
 	//   subcommand a
 	//   -id int
 	//     	param id
-	//   -?0 string
+	//   ?0 string
 	//     	param path
 	// $testapp b ...
 	//   subcommand b
@@ -211,7 +211,7 @@ func ExampleApp() {
 	//   subcommand a
 	//   -id int
 	//     	param id
-	//   -?0 string
+	//   ?0 string
 	//     	param path
 	// $testapp b ...
 	//   subcommand b

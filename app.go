@@ -800,6 +800,7 @@ func (c *Command) newUsageLocked() (text string, body string) {
 			ellipsis = " ..."
 		}
 		text = fmt.Sprintf("$%s%s\n  %s\n", c.PathString(), ellipsis, c.description)
+		body = strings.Replace(body, "-?", "?", -1)
 	} else {
 		body = strings.Replace(body, "  -?", "?", -1)
 		body = strings.Replace(body, "  -", "-", -1)
