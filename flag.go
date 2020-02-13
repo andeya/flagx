@@ -418,8 +418,38 @@ func (f *FlagSet) Lookup(name string) *Flag {
 	if v != nil {
 		return v
 	}
+	v, _ = f.nonLookup(name)
+	return v
+}
+
+func (f *FlagSet) nonLookup(name string) (*Flag, int) {
 	idx, _, _ := getNonFlagIndex(name)
-	return f.nonFormal[idx]
+	return f.nonFormal[idx], idx
+}
+
+// Set sets the value of the named flag.
+func (f *FlagSet) Set(name, value string) error {
+	v := f.FlagSet.Lookup(name)
+	if v != nil {
+		return f.FlagSet.Set(name, value)
+	}
+	v, idx := f.nonLookup(name)
+	if v != nil {
+		err := v.Value.Set(value)
+		if err != nil {
+			return err
+		}
+		if f.nonActual == nil {
+			f.nonActual = make(map[int]*Flag)
+		}
+		f.nonActual[idx] = v
+		return nil
+	}
+	var prefix string
+	if idx < 0 {
+		prefix = "-"
+	}
+	return fmt.Errorf("no such flag %s%s", prefix, name)
 }
 
 // PrintDefaults prints, to standard error unless configured otherwise, the
