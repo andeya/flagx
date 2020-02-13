@@ -35,16 +35,17 @@ type (
 	}
 	// Command a command object
 	Command struct {
-		app         *App
-		parent      *Command
-		cmdName     string
-		description string
-		filters     []*filterObject
-		action      *actionObject
-		subcommands map[string]*Command
-		usageBody   string
-		usageText   string
-		lock        sync.RWMutex
+		app                *App
+		parent             *Command
+		cmdName            string
+		description        string
+		filters            []*filterObject
+		action             *actionObject
+		subcommands        map[string]*Command
+		usageBody          string
+		usageText          string
+		parentUsageVisible bool
+		lock               sync.RWMutex
 	}
 	// ValidateFunc validator for struct flag
 	ValidateFunc func(interface{}) error
@@ -188,10 +189,11 @@ func (a *App) init() *App {
 
 func newCommand(app *App, cmdName, description string) *Command {
 	return &Command{
-		app:         app,
-		cmdName:     cmdName,
-		description: description,
-		subcommands: make(map[string]*Command, 16),
+		app:                app,
+		cmdName:            cmdName,
+		description:        description,
+		subcommands:        make(map[string]*Command, 16),
+		parentUsageVisible: true, // default
 	}
 }
 
@@ -610,14 +612,6 @@ func (c *Command) PathString() string {
 	return strings.Join(c.Path(), " ")
 }
 
-// UsageText returns the usage text.
-func (c *Command) UsageText(prefix ...string) string {
-	if len(prefix) > 0 {
-		return strings.Replace(c.usageText, "\n", "\n"+prefix[0], -1)
-	}
-	return c.usageText
-}
-
 // Root returns the root command.
 // NOTE:
 //  returns nil if it does not exist.
@@ -715,13 +709,17 @@ func (c *Context) CheckStatus(err error, code int32, msg string, whenError ...fu
 	panic(status.New(code, msg, err).TagStack(1))
 }
 
-// String makes Author comply to the Stringer interface, to allow an easy print in the templating process
-func (a Author) String() string {
-	e := ""
-	if a.Email != "" {
-		e = " <" + a.Email + ">"
+// SetParentVisible sets the visibility in parent command usage.
+func (c *Command) SetParentVisible(visible bool) {
+	c.parentUsageVisible = visible
+}
+
+// UsageText returns the usage text.
+func (c *Command) UsageText(prefix ...string) string {
+	if len(prefix) > 0 {
+		return strings.Replace(c.usageText, "\n", "\n"+prefix[0], -1)
 	}
-	return fmt.Sprintf("%v%v", a.Name, e)
+	return c.usageText
 }
 
 // defaultAppUsageTemplate is the text template for the Default help topic.
@@ -768,7 +766,9 @@ func (c *Command) updateUsageLocked() {
 	subcommands := c.Subcommands()
 	for _, subCmd := range subcommands {
 		subCmd.updateUsageLocked()
-		c.usageText += subCmd.usageText
+		if subCmd.parentUsageVisible {
+			c.usageText += subCmd.usageText
+		}
 	}
 }
 
@@ -803,4 +803,13 @@ func (c *Command) newUsageLocked() (text string, body string) {
 	}
 	text += body
 	return text, body
+}
+
+// String makes Author comply to the Stringer interface, to allow an easy print in the templating process
+func (a Author) String() string {
+	e := ""
+	if a.Email != "" {
+		e = " <" + a.Email + ">"
+	}
+	return fmt.Sprintf("%v%v", a.Name, e)
 }
