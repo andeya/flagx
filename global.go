@@ -415,7 +415,7 @@ func UnquoteUsage(f *Flag) (name string, usage string) {
 	name = "value"
 	switch f.Value.(type) {
 	case boolFlag:
-		name = ""
+		name = "bool"
 	case *durationValue:
 		name = "duration"
 	case *float64Value:
