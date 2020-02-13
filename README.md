@@ -138,7 +138,7 @@ func ExampleApp() {
 		b.AddSubaction("d", "subcommand d", flagx.ActionFunc(Action3))
 	}
 	app.SetNotFound(func(c *flagx.Context) {
-		fmt.Printf("NotFound: args=%+v, path=%q\n", c.Args(), c.CmdPathString())
+		fmt.Printf("NotFound: cmd=%q, uasge=%s\n", c.CmdPathString(), c.UsageText())
 	})
 
 	fmt.Println(app.UsageText())
@@ -203,11 +203,37 @@ func ExampleApp() {
 	// AUTHOR:
 	//   henrylee2cn <henrylee2cn@gmail.com>
 	//
-	// NotFound: args=[-g=flagx false], path="testapp"
+	// NotFound: cmd="testapp", uasge=-g string
+	//   	global param g
+	// ?0 bool
+	//   	param view
+	// $testapp a
+	//   subcommand a
+	//   -id int
+	//     	param id
+	//   -?0 string
+	//     	param path
+	// $testapp b ...
+	//   subcommand b
+	// $testapp b c
+	//   subcommand c
+	//   -name string
+	//     	param name
+	// $testapp b d
+	//   subcommand d
+	//
 	// Filter1 start: args=[-g=henry true a -id 1 ~/m/n], G=henry
 	// Action1: args=[-g=henry true a -id 1 ~/m/n], path="testapp a", object=&{ID:1 Path:~/m/n}
 	// Filter1 end: args=[-g=henry true a -id 1 ~/m/n]
-	// NotFound: args=[-g=flagx false b], path="testapp b"
+	// NotFound: cmd="testapp b", uasge=$testapp b ...
+	//   subcommand b
+	// $testapp b c
+	//   subcommand c
+	//   -name string
+	//     	param name
+	// $testapp b d
+	//   subcommand d
+	//
 	// Filter1 start: args=[-g=flagx false b c name=henry], V=false
 	// Filter2 start: args=[-g=flagx false b c name=henry], start at=2020-02-13 13:48:15 +0800 CST
 	// Action2: args=[-g=flagx false b c name=henry], path="testapp b c", object=&{Name:}
