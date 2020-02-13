@@ -30,6 +30,7 @@ type (
 		notFound      ActionFunc
 		usageTemplate *template.Template
 		validator     ValidateFunc
+		usageText     string
 		lock          sync.RWMutex
 	}
 	// Command a command object
@@ -699,7 +700,7 @@ func (c *Command) updateAllUsageLocked() {
 	if err != nil {
 		panic(err)
 	}
-	a.Command.usageText = strings.Replace(buf.String(), "\n\n\n", "\n\n", -1)
+	a.usageText = strings.Replace(buf.String(), "\n\n\n", "\n\n", -1)
 }
 
 func (c *Command) sortedSubcommands() []*Command {
