@@ -41,9 +41,9 @@ func TestUnquoteUsage(t *testing.T) {
 		BoolFlag     bool          `flag:"BoolFlag; def=true; usage=Cool experience"`
 		IntFlag      int           `flag:""`
 		Int64Flag    int64         `flag:""`
-		UintFlag     uint          `flag:""`
-		Uint64Flag   uint64        `flag:""`
-		Float64Flag  float64       `flag:""`
+		UintFlag     uint          `flag:"?0;usage=xxx"`
+		Uint64Flag   uint64        `flag:"usage=uuu"`
+		Float64Flag  float64       `flag:"?1"`
 		DurationFlag time.Duration `flag:""`
 	}
 	var args Args

@@ -1,6 +1,7 @@
 package flagx
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -621,9 +622,8 @@ func getNonFlagIndex(name string) (int, bool, error) {
 		return -1, false, nil
 	}
 	i, err := ameda.StringToInt(s, true)
-	return i, true, err
-}
-
-func isNonFlag(f *Flag) bool {
-	return strings.HasPrefix(f.Name, "?")
+	if err != nil || i < 0 {
+		return -1, true, errors.New("invalid non-flag index")
+	}
+	return i, true, nil
 }

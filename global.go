@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -394,7 +395,7 @@ func UintVar(p *uint, name string, value uint, usage string) {
 // If there are no back quotes, the name is an educated guess of the
 // type of the flag's value, or the empty string if the flag is boolean.
 func UnquoteUsage(f *Flag) (name string, usage string) {
-	if !isNonFlag(f) {
+	if !IsNonFlag(f) {
 		return flag.UnquoteUsage(f)
 	}
 	// Look for a back-quoted name, but avoid the strings package.
@@ -474,4 +475,15 @@ func NonVisitAll(fn func(*Flag)) {
 // for each. It visits only those non-flags that have been set.
 func NonVisit(fn func(*Flag)) {
 	CommandLine.NonVisit(fn)
+}
+
+// IsNonFlag determines if it is non-flag.
+func IsNonFlag(f *Flag) bool {
+	return strings.HasPrefix(f.Name, "?")
+}
+
+// NonFlagIndex gets the non-flag index from name.
+func NonFlagIndex(nonFlag *Flag) (int, bool) {
+	idx, _, _ := getNonFlagIndex(nonFlag.Name)
+	return idx, idx >= 0
 }
