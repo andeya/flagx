@@ -721,7 +721,8 @@ func (c *Command) SetParentVisible(visible bool) {
 // UsageText returns the usage text.
 func (c *Command) UsageText(prefix ...string) string {
 	if len(prefix) > 0 {
-		return strings.Replace(c.usageText, "\n", "\n"+prefix[0], -1)
+		s := "\n" + prefix[0]
+		return strings.TrimSuffix(prefix[0]+strings.Replace(c.usageText, "\n", s, -1), s)
 	}
 	return c.usageText
 }
@@ -746,7 +747,7 @@ COPYRIGHT:
 func (c *Command) updateAllUsageLocked() {
 	a := c.app
 	a.Command.updateUsageLocked()
-	text := a.Command.usageText
+	text := a.Command.UsageText("  ")
 	data := map[string]interface{}{
 		"AppName":     a.appName,
 		"CmdName":     a.cmdName,
@@ -761,7 +762,14 @@ func (c *Command) updateAllUsageLocked() {
 	if err != nil {
 		panic(err)
 	}
-	a.usageText = strings.Replace(buf.String(), "\n\n\n", "\n\n", -1)
+	s := buf.String()
+	for {
+		a.usageText = strings.Replace(s, "\n\n\n", "\n\n", -1)
+		if a.usageText == s {
+			return
+		}
+		s = a.usageText
+	}
 }
 
 func (c *Command) updateUsageLocked() {
@@ -799,6 +807,9 @@ func (c *Command) newUsageLocked() (text string, body string) {
 			ellipsis = " ..."
 		}
 		text = fmt.Sprintf("$%s%s\n  %s\n", c.PathString(), ellipsis, c.description)
+	} else {
+		body = strings.Replace(body, "  -", "-", -1)
+		body = strings.Replace(body, "\n    \t", "\n  \t", -1)
 	}
 	body = strings.Replace(body, "-?", "?", -1)
 	text += body

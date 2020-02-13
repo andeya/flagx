@@ -77,28 +77,28 @@ func ExampleApp() {
 	//     	global param g
 	//   ?0 bool
 	//     	param view
-	// $testapp a
-	//   subcommand a
-	//   -id int
-	//     	param id
-	//   ?0 string
-	//     	param path
-	// $testapp b ...
-	//   subcommand b
-	// $testapp b c
-	//   subcommand c
-	//   -name string
-	//     	param name
-	// $testapp b d
-	//   subcommand d
+	//   $testapp a
+	//     subcommand a
+	//     -id int
+	//       	param id
+	//     ?0 string
+	//       	param path
+	//   $testapp b ...
+	//     subcommand b
+	//   $testapp b c
+	//     subcommand c
+	//     -name string
+	//       	param name
+	//   $testapp b d
+	//     subcommand d
 	//
 	// AUTHOR:
 	//   henrylee2cn <henrylee2cn@gmail.com>
 	//
-	// NotFound: cmd="testapp", uasge=  -g string
-	//     	global param g
-	//   ?0 bool
-	//     	param view
+	// NotFound: cmd="testapp", uasge=-g string
+	//   	global param g
+	// ?0 bool
+	//   	param view
 	// $testapp a
 	//   subcommand a
 	//   -id int
