@@ -427,7 +427,7 @@ func (f *FlagSet) nonLookup(name string) (*Flag, int) {
 	return f.nonFormal[idx], idx
 }
 
-// Set sets the value of the named flag.
+// Set sets the value of the named flag or the non-flag.
 func (f *FlagSet) Set(name, value string) error {
 	v := f.FlagSet.Lookup(name)
 	if v != nil {
