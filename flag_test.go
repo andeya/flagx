@@ -166,4 +166,11 @@ func TestNonVar(t *testing.T) {
 	assert.Equal(t, 1, *intVal)
 	assert.Equal(t, true, *boolVal)
 	fs.Usage()
+
+	fs = NewFlagSet("non-flag-test2", ContinueOnError|ContinueOnUndefined)
+	runVal = fs.String("run", "", "")
+	err = fs.Parse([]string{"-run", "abc", "5s", "1", "true"})
+	assert.NoError(t, err)
+	assert.Equal(t, "abc", *runVal)
+	fs.Usage()
 }
