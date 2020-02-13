@@ -728,13 +728,12 @@ func (c *Command) UsageText(prefix ...string) string {
 
 // defaultAppUsageTemplate is the text template for the Default help topic.
 var defaultAppUsageTemplate = template.Must(template.New("appUsage").
-	Funcs(template.FuncMap{"join": strings.Join}).
 	Parse(`{{if .AppName}}{{.AppName}}{{else}}{{.CmdName}}{{end}}{{if .Version}} - v{{.Version}}{{end}}{{if .Description}}
 
 {{.Description}}{{end}}
 
 USAGE:
-  {{.Usage}}{{if len .Authors}}
+{{.Usage}}{{if len .Authors}}
 
 AUTHOR{{with $length := len .Authors}}{{if ne 1 $length}}S{{end}}{{end}}:
 {{range $index, $author := .Authors}}{{if $index}}
@@ -800,12 +799,8 @@ func (c *Command) newUsageLocked() (text string, body string) {
 			ellipsis = " ..."
 		}
 		text = fmt.Sprintf("$%s%s\n  %s\n", c.PathString(), ellipsis, c.description)
-		body = strings.Replace(body, "-?", "?", -1)
-	} else {
-		body = strings.Replace(body, "  -?", "?", -1)
-		body = strings.Replace(body, "  -", "-", -1)
-		body = strings.Replace(body, "\n    \t", "\n  \t", -1)
 	}
+	body = strings.Replace(body, "-?", "?", -1)
 	text += body
 	return text, body
 }

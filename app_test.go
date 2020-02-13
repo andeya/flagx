@@ -74,9 +74,9 @@ func ExampleApp() {
 	//
 	// USAGE:
 	//   -g string
-	//   	global param g
-	// ?0 bool
-	//   	param view
+	//     	global param g
+	//   ?0 bool
+	//     	param view
 	// $testapp a
 	//   subcommand a
 	//   -id int
@@ -95,10 +95,10 @@ func ExampleApp() {
 	// AUTHOR:
 	//   henrylee2cn <henrylee2cn@gmail.com>
 	//
-	// NotFound: cmd="testapp", uasge=-g string
-	//   	global param g
-	// ?0 bool
-	//   	param view
+	// NotFound: cmd="testapp", uasge=  -g string
+	//     	global param g
+	//   ?0 bool
+	//     	param view
 	// $testapp a
 	//   subcommand a
 	//   -id int
