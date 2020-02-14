@@ -445,7 +445,7 @@ func (a *App) SetNotFound(fn ActionFunc) {
 	a.notFound = fn
 }
 
-// SetValidator sets a parameter validator for a struct action or struct filter.
+// SetValidator sets parameter validator for struct action and struct filter.
 func (a *App) SetValidator(fn ValidateFunc) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
