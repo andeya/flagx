@@ -335,13 +335,6 @@ func (fn FilterFunc) Filter(c *Context, next ActionFunc) {
 	fn(c, next)
 }
 
-// SetValidator sets the validation function.
-func (a *App) SetValidator(validator ValidateFunc) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	a.validator = validator
-}
-
 // AddSubaction adds a subcommand and its action.
 // NOTE:
 //  panic when something goes wrong
@@ -452,8 +445,8 @@ func (a *App) SetNotFound(fn ActionFunc) {
 	a.notFound = fn
 }
 
-// SetDefaultValidator sets the default validator of struct flag.
-func (a *App) SetDefaultValidator(fn ValidateFunc) {
+// SetValidator sets the validator of struct flag.
+func (a *App) SetValidator(fn ValidateFunc) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.validator = fn
