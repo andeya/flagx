@@ -113,9 +113,12 @@ package flagx_test
 import (
 	"context"
 	"fmt"
+	"testing"
 	"time"
 
+	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/henrylee2cn/flagx"
+	"github.com/stretchr/testify/assert"
 )
 
 func ExampleApp() {
@@ -126,7 +129,9 @@ func ExampleApp() {
 		Name:  "henrylee2cn",
 		Email: "henrylee2cn@gmail.com",
 	}})
-
+	app.SetValidator(func(v interface{}) error {
+		return vd.Validate(v)
+	})
 	app.AddFilter(new(Filter1))
 	// cmd: testapp a
 	app.AddSubaction("a", "subcommand a", new(Action1))
@@ -277,7 +282,7 @@ func Filter2(c *flagx.Context, next flagx.ActionFunc) {
 }
 
 type Action1 struct {
-	ID   int    `flag:"id;usage=param id"`
+	ID   int    `flag:"id;usage=param id" vd:"@:$!=0; msg:'empty ID'"`
 	Path string `flag:"?0;usage=param path"`
 }
 
