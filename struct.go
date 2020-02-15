@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/henrylee2cn/ameda"
-	"github.com/henrylee2cn/goutil/tpack"
 )
 
 // struct tags are used by *FlagSet.StructVars.
@@ -21,7 +20,7 @@ const (
 	tagKeyNonFlag = "?"
 )
 
-var timeDurationTypeID = tpack.Unpack(time.Duration(0)).RuntimeTypeID()
+var timeDurationTypeID = ameda.ValueOf(time.Duration(0)).RuntimeTypeID()
 
 func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[int32]struct{}) error {
 	v = ameda.DereferenceValue(v)
@@ -29,7 +28,7 @@ func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[int32]struct{
 		return fmt.Errorf("flagx: want struct pointer field, but got %s", v.Type().String())
 	}
 	t := v.Type()
-	tid := tpack.RuntimeTypeID(t)
+	tid := ameda.RuntimeTypeID(t)
 	if _, ok := structTypeIDs[tid]; ok {
 		return nil
 	}
@@ -173,7 +172,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 			}
 		}
 	case reflect.Int64:
-		if tpack.RuntimeTypeID(elem.Type()) == timeDurationTypeID {
+		if ameda.RuntimeTypeID(elem.Type()) == timeDurationTypeID {
 			var b time.Duration
 			if def != "" {
 				b, err = time.ParseDuration(def)
