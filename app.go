@@ -591,7 +591,7 @@ func (c *Command) Path() (p []string) {
 	for {
 		if r.parent == nil {
 			p = append(p, r.cmdName)
-			ameda.NewStringSlice(p).Reverse()
+			ameda.StringsReverse(p)
 			return
 		}
 		p = append(p, r.cmdName)
