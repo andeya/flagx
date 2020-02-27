@@ -370,34 +370,36 @@ func (c *Command) AddSubcommand(cmdName, description string, filters ...Filter) 
 // NOTE:
 //  if filter is a struct, it can implement the copier interface;
 //  panic when something goes wrong
-func (c *Command) AddFilter(filter Filter) {
+func (c *Command) AddFilter(filters ...Filter) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	var obj filterObject
-	obj.flagSet = NewFlagSet(c.cmdName, ContinueOnError|ContinueOnUndefined)
+	for _, filter := range filters {
+		var obj filterObject
+		obj.flagSet = NewFlagSet(c.cmdName, ContinueOnError|ContinueOnUndefined)
 
-	elemType := ameda.DereferenceType(reflect.TypeOf(filter))
-	switch elemType.Kind() {
-	case reflect.Struct:
-		var ok bool
-		obj.factory, ok = filter.(FilterCopier)
-		if !ok {
-			obj.factory = &factory{elemType: elemType}
-		}
-		err := obj.flagSet.StructVars(obj.factory.DeepCopy())
-		if err != nil {
-			panic(err)
-		}
-		obj.flagSet.VisitAll(func(f *Flag) {
-			if obj.options == nil {
-				obj.options = make(map[string]*Flag)
+		elemType := ameda.DereferenceType(reflect.TypeOf(filter))
+		switch elemType.Kind() {
+		case reflect.Struct:
+			var ok bool
+			obj.factory, ok = filter.(FilterCopier)
+			if !ok {
+				obj.factory = &factory{elemType: elemType}
 			}
-			obj.options[f.Name] = f
-		})
-	case reflect.Func:
-		obj.filterFunc = filter.Filter
+			err := obj.flagSet.StructVars(obj.factory.DeepCopy())
+			if err != nil {
+				panic(err)
+			}
+			obj.flagSet.VisitAll(func(f *Flag) {
+				if obj.options == nil {
+					obj.options = make(map[string]*Flag)
+				}
+				obj.options[f.Name] = f
+			})
+		case reflect.Func:
+			obj.filterFunc = filter.Filter
+		}
+		c.filters = append(c.filters, &obj)
 	}
-	c.filters = append(c.filters, &obj)
 	c.updateAllUsageLocked()
 }
 
