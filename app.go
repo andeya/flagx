@@ -359,9 +359,7 @@ func (c *Command) AddSubcommand(cmdName, description string, filters ...Filter) 
 	}
 	subCmd := newCommand(c.app, cmdName, description)
 	subCmd.parent = c
-	for _, filter := range filters {
-		subCmd.AddFilter(filter)
-	}
+	subCmd.AddFilter(filters...)
 	c.subcommands[cmdName] = subCmd
 	return subCmd
 }
