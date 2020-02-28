@@ -45,6 +45,7 @@ type (
 		usageBody          string
 		usageText          string
 		parentUsageVisible bool
+		meta               map[interface{}]interface{}
 		lock               sync.RWMutex
 	}
 	// ValidateFunc validator for struct flag
@@ -179,7 +180,9 @@ func NewApp() *App {
 
 func (a *App) init() *App {
 	a.SetUsageTemplate(defaultAppUsageTemplate)
+	a.lock.Lock()
 	a.Command = newCommand(a, "", "")
+	a.lock.Unlock()
 	a.SetCmdName("")
 	a.SetName("")
 	a.SetVersion("")
@@ -335,6 +338,20 @@ func (fn FilterFunc) Filter(c *Context, next ActionFunc) {
 	fn(c, next)
 }
 
+// SetMeta sets the command meta.
+func (c *Command) SetMeta(key interface{}, val interface{}) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.meta[key] = val
+}
+
+// GetMeta gets the command meta.
+func (c *Command) GetMeta(key interface{}) interface{} {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.meta[key]
+}
+
 // AddSubaction adds a subcommand and its action.
 // NOTE:
 //  panic when something goes wrong
@@ -346,14 +363,14 @@ func (c *Command) AddSubaction(cmdName, description string, action Action, filte
 // NOTE:
 //  panic when something goes wrong
 func (c *Command) AddSubcommand(cmdName, description string, filters ...Filter) *Command {
-	if c.action != nil {
-		panic(fmt.Errorf("action has been set, no subcommand can be set: %q", c.PathString()))
-	}
 	if cmdName == "" {
 		panic("command name is empty")
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	if c.action != nil {
+		panic(fmt.Errorf("action has been set, no subcommand can be set: %q", c.PathString()))
+	}
 	if c.subcommands[cmdName] != nil {
 		panic(fmt.Errorf("action named %s already exists", cmdName))
 	}
@@ -406,6 +423,8 @@ func (c *Command) AddFilter(filters ...Filter) {
 //  if action is a struct, it can implement the copier interface;
 //  panic when something goes wrong.
 func (c *Command) SetAction(action Action) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	if len(c.subcommands) > 0 {
 		panic(fmt.Errorf("some subcommands have been set, no action can be set: %q", c.PathString()))
 	}
@@ -666,6 +685,11 @@ func (c *Command) Filters() map[string]*Flag {
 // Args returns the command arguments.
 func (c *Context) Args() []string {
 	return c.args
+}
+
+// GetCmdMeta gets the command meta.
+func (c *Context) GetCmdMeta(key interface{}) interface{} {
+	return c.cmd.GetMeta(key)
 }
 
 // CmdPath returns the command path slice.
