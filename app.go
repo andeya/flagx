@@ -677,8 +677,8 @@ func (c *Command) Subcommands() []*Command {
 	return cmds
 }
 
-// Filters returns the formal flags.
-func (c *Command) Filters() map[string]*Flag {
+// Flags returns the formal flags.
+func (c *Command) Flags() map[string]*Flag {
 	if c.action == nil {
 		return nil
 	}
