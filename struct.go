@@ -66,7 +66,7 @@ func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[int32]struct{
 				}
 				continue
 			} else {
-				return fmt.Errorf("flagx: not support field %s, type=%s", ft.Name, ft.Type.String())
+				return fmt.Errorf("flagx: not support field %s, type=%s, kind=%s", ft.Name, ft.Type.String(), kind)
 			}
 		}
 		keys := strings.SplitN(tag, ";", 3)

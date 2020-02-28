@@ -342,6 +342,9 @@ func (fn FilterFunc) Filter(c *Context, next ActionFunc) {
 func (c *Command) SetMeta(key interface{}, val interface{}) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	if c.meta == nil {
+		c.meta = make(map[interface{}]interface{}, 16)
+	}
 	c.meta[key] = val
 }
 
