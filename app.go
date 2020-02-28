@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/henrylee2cn/ameda"
+	"github.com/henrylee2cn/goutil"
 	"github.com/henrylee2cn/goutil/status"
 )
 
@@ -22,32 +23,41 @@ type (
 	// an app be created with the flagx.NewApp() function
 	App struct {
 		*Command
-		appName       string
-		version       string
-		compiled      time.Time
-		authors       []Author
-		copyright     string
-		notFound      ActionFunc
-		usageTemplate *template.Template
-		validator     ValidateFunc
-		usageText     string
-		lock          sync.RWMutex
+		appName                 string
+		version                 string
+		compiled                time.Time
+		authors                 []Author
+		copyright               string
+		notFound                ActionFunc
+		usageTemplate           *template.Template
+		validator               ValidateFunc
+		usageText               string
+		execScopeUsageTexts     map[Scope]string
+		execScopeUsageTextsLock sync.RWMutex
+		scopeMatcherFunc        func(cmdScope, execScope Scope) error
+		lock                    sync.RWMutex
 	}
 	// Command a command object
 	Command struct {
-		app                *App
-		parent             *Command
-		cmdName            string
-		description        string
-		filters            []*filterObject
-		action             *actionObject
-		subcommands        map[string]*Command
-		usageBody          string
-		usageText          string
-		parentUsageVisible bool
-		meta               map[interface{}]interface{}
-		lock               sync.RWMutex
+		app                     *App
+		parent                  *Command
+		cmdName                 string
+		description             string
+		scope                   Scope
+		filters                 []*filterObject
+		action                  *actionObject
+		subcommands             map[string]*Command
+		scopeCommandMap         map[Scope][]*Command // commands with actions by scope
+		scopeCommands           []*Command           // commands with actions by scope
+		usageText               string
+		execScopeUsageTexts     map[Scope]string
+		execScopeUsageTextsLock sync.RWMutex
+		parentUsageVisible      bool
+		meta                    map[interface{}]interface{}
+		lock                    sync.RWMutex
 	}
+	// Scope command scope
+	Scope int32
 	// ValidateFunc validator for struct flag
 	ValidateFunc func(interface{}) error
 	// Action action of action
@@ -82,9 +92,10 @@ type (
 	// Context context of an action execution
 	Context struct {
 		context.Context
-		args    []string
-		cmdPath []string
-		cmd     *Command
+		args      []string
+		cmdPath   []string
+		cmd       *Command
+		execScope Scope
 	}
 	// Author represents someone who has contributed to a cli project.
 	Author struct {
@@ -116,12 +127,18 @@ type (
 	}
 )
 
+const (
+	// InitialScope the default scope
+	InitialScope Scope = 0
+)
+
 // Status code
 const (
 	StatusBadArgs        int32 = 1
 	StatusNotFound       int32 = 2
 	StatusParseFailed    int32 = 3
 	StatusValidateFailed int32 = 4
+	StatusMismatchScope  int32 = 5
 )
 
 const (
@@ -175,14 +192,8 @@ var (
 // NewApp creates a new application.
 func NewApp() *App {
 	a := new(App)
-	return a.init()
-}
-
-func (a *App) init() *App {
-	a.SetUsageTemplate(defaultAppUsageTemplate)
-	a.lock.Lock()
 	a.Command = newCommand(a, "", "")
-	a.lock.Unlock()
+	a.SetUsageTemplate(defaultAppUsageTemplate)
 	a.SetCmdName("")
 	a.SetName("")
 	a.SetVersion("")
@@ -218,7 +229,7 @@ func (a *App) SetCmdName(cmdName string) {
 		cmdName = filepath.Base(os.Args[0])
 	}
 	a.cmdName = strings.TrimLeft(cmdName, "-")
-	a.updateAllUsageLocked()
+	a.updateUsageLocked()
 }
 
 // Name returns the name(title) of the application.
@@ -237,7 +248,7 @@ func (a *App) SetName(appName string) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.appName = appName
-	a.updateAllUsageLocked()
+	a.updateUsageLocked()
 }
 
 // Description returns description the of the application.
@@ -252,7 +263,7 @@ func (a *App) SetDescription(description string) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.description = description
-	a.updateAllUsageLocked()
+	a.updateUsageLocked()
 }
 
 // Version returns the version of the application.
@@ -272,7 +283,7 @@ func (a *App) SetVersion(version string) {
 		version = "0.0.1"
 	}
 	a.version = version
-	a.updateAllUsageLocked()
+	a.updateUsageLocked()
 }
 
 // Compiled returns the compilation date.
@@ -295,7 +306,7 @@ func (a *App) SetCompiled(date time.Time) {
 		}
 	}
 	a.compiled = date
-	a.updateAllUsageLocked()
+	a.updateUsageLocked()
 }
 
 // Authors returns the list of all authors who contributed.
@@ -310,7 +321,7 @@ func (a *App) SetAuthors(authors []Author) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.authors = authors
-	a.updateAllUsageLocked()
+	a.updateUsageLocked()
 }
 
 // Copyright returns the copyright of the binary if any.
@@ -325,7 +336,7 @@ func (a *App) SetCopyright(copyright string) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.copyright = copyright
-	a.updateAllUsageLocked()
+	a.updateUsageLocked()
 }
 
 // Handle implements Action interface.
@@ -358,8 +369,8 @@ func (c *Command) GetMeta(key interface{}) interface{} {
 // AddSubaction adds a subcommand and its action.
 // NOTE:
 //  panic when something goes wrong
-func (c *Command) AddSubaction(cmdName, description string, action Action, filters ...Filter) {
-	c.AddSubcommand(cmdName, description, filters...).SetAction(action)
+func (c *Command) AddSubaction(cmdName, description string, action Action, scope ...Scope) {
+	c.AddSubcommand(cmdName, description).SetAction(action, scope...)
 }
 
 // AddSubcommand adds a subcommand.
@@ -394,7 +405,6 @@ func (c *Command) AddFilter(filters ...Filter) {
 	for _, filter := range filters {
 		var obj filterObject
 		obj.flagSet = NewFlagSet(c.cmdName, ContinueOnError|ContinueOnUndefined)
-
 		elemType := ameda.DereferenceType(reflect.TypeOf(filter))
 		switch elemType.Kind() {
 		case reflect.Struct:
@@ -418,23 +428,25 @@ func (c *Command) AddFilter(filters ...Filter) {
 		}
 		c.filters = append(c.filters, &obj)
 	}
-	c.updateAllUsageLocked()
+	c.app.updateUsageLocked()
 }
 
 // SetAction sets the action of the command.
 // NOTE:
 //  if action is a struct, it can implement the copier interface;
 //  panic when something goes wrong.
-func (c *Command) SetAction(action Action) {
+func (c *Command) SetAction(action Action, scope ...Scope) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if len(c.subcommands) > 0 {
 		panic(fmt.Errorf("some subcommands have been set, no action can be set: %q", c.PathString()))
 	}
+	if c.action != nil {
+		panic(fmt.Errorf("an action have been set: %q", c.PathString()))
+	}
 	var obj actionObject
 	obj.cmd = c
 	obj.flagSet = NewFlagSet(c.cmdName, ContinueOnError|ContinueOnUndefined)
-
 	elemType := ameda.DereferenceType(reflect.TypeOf(action))
 	switch elemType.Kind() {
 	case reflect.Struct:
@@ -457,7 +469,54 @@ func (c *Command) SetAction(action Action) {
 		obj.actionFunc = action.Handle
 	}
 	c.action = &obj
-	c.updateAllUsageLocked()
+	if len(scope) > 0 {
+		c.scope = scope[0]
+	}
+	c.bubbleSetScopeCmd(c.scope, nil)
+	c.app.updateUsageLocked()
+}
+
+func (c *Command) bubbleSetScopeCmd(scope Scope, subcmds []*Command) {
+	if c.scopeCommandMap == nil {
+		c.scopeCommandMap = make(map[Scope][]*Command, 16)
+	}
+	cmds := append(subcmds, c)
+	c.scopeCommandMap[scope] = cmdsDistinctAndSort(append(c.scopeCommandMap[scope], cmds...))
+	c.scopeCommands = cmdsDistinctAndSort(append(c.scopeCommands, cmds...))
+	if c.parent != nil {
+		c.parent.bubbleSetScopeCmd(scope, cmds)
+	}
+}
+
+func cmdsDistinctAndSort(cmds []*Command) []*Command {
+	m := make(map[*Command]bool, len(cmds))
+	for _, cmd := range cmds {
+		m[cmd] = true
+	}
+	cmds = cmds[:0]
+	for cmd := range m {
+		cmds = append(cmds, cmd)
+	}
+	sort.Sort(commandList(cmds))
+	return cmds
+}
+
+type commandList []*Command
+
+// Len is the number of elements in the collection.
+func (c commandList) Len() int {
+	return len(c)
+}
+
+// Less reports whether the element with
+// index i should sort before the element with index j.
+func (c commandList) Less(i, j int) bool {
+	return c[i].PathString() < c[j].PathString()
+}
+
+// Swap swaps the elements with indexes i and j.
+func (c commandList) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
 }
 
 // SetNotFound sets the action when the correct command cannot be found.
@@ -481,18 +540,32 @@ func (a *App) SetUsageTemplate(tmpl *template.Template) {
 	a.usageTemplate = tmpl
 }
 
+// SetScopeMatcher sets the scope matching function.
+func (a *App) SetScopeMatcher(fn func(cmdScope, execScope Scope) error) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.scopeMatcherFunc = fn
+}
+
 // Exec executes the command.
-func (c *Command) Exec(ctx context.Context, arguments []string) (stat *Status) {
+// NOTE:
+//  @arguments does not contain the command name;
+//  the default value of @scope is 0.
+func (c *Command) Exec(ctx context.Context, arguments []string, execScope ...Scope) (stat *Status) {
 	defer status.Catch(&stat)
-	handle, ctxObj := c.route(ctx, arguments)
+	var s Scope
+	if len(execScope) > 0 {
+		s = execScope[0]
+	}
+	handle, ctxObj := c.route(ctx, arguments, s)
 	handle(ctxObj)
 	return
 }
 
-func (c *Command) route(ctx context.Context, arguments []string) (ActionFunc, *Context) {
+func (c *Command) route(ctx context.Context, arguments []string, execScope Scope) (ActionFunc, *Context) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	filters, action, cmdPath, cmd, found := c.findFiltersAndAction([]string{c.cmdName}, arguments)
+	filters, action, cmdPath, cmd, found := c.findFiltersAndAction([]string{c.cmdName}, arguments, execScope)
 	actionFunc := action.Handle
 	if found {
 		for i := len(filters) - 1; i >= 0; i-- {
@@ -503,10 +576,13 @@ func (c *Command) route(ctx context.Context, arguments []string) (ActionFunc, *C
 			}
 		}
 	}
-	return actionFunc, &Context{args: arguments, cmdPath: cmdPath, Context: ctx, cmd: cmd}
+	return actionFunc, &Context{args: arguments, cmdPath: cmdPath, Context: ctx, cmd: cmd, execScope: execScope}
 }
 
-func (c *Command) findFiltersAndAction(cmdPath, arguments []string) ([]Filter, Action, []string, *Command, bool) {
+func (c *Command) findFiltersAndAction(cmdPath, arguments []string, execScope Scope) ([]Filter, Action, []string, *Command, bool) {
+	if c.action != nil && c.app.scopeMatcherFunc != nil {
+		CheckStatus(c.app.scopeMatcherFunc(c.scope, execScope), StatusMismatchScope, "")
+	}
 	filters, arguments := c.newFilters(arguments)
 	action, arguments, found := c.newAction(arguments)
 	if found {
@@ -528,7 +604,7 @@ func (c *Command) findFiltersAndAction(cmdPath, arguments []string) ([]Filter, A
 		)
 		return nil, nil, cmdPath, c, false
 	}
-	subFilters, action, cmdPath, subCmd2, found := subCmd.findFiltersAndAction(cmdPath, arguments)
+	subFilters, action, cmdPath, subCmd2, found := subCmd.findFiltersAndAction(cmdPath, arguments, execScope)
 	if found {
 		filters = append(filters, subFilters...)
 		return filters, action, cmdPath, subCmd2, true
@@ -582,16 +658,6 @@ func (c *Command) newAction(cmdline []string) (Action, []string, bool) {
 	}
 	CheckStatus(err, StatusValidateFailed, "")
 	return newObj.(Action), flagSet.NextArgs(), true
-}
-
-// UsageText returns the usage text.
-func (a *App) UsageText() string {
-	if a.CmdName() == "" { // not initialized with flagx.NewApp()
-		a.init()
-	}
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-	return a.usageText
 }
 
 func (h *actionFactory) DeepCopy() Action {
@@ -677,6 +743,26 @@ func (c *Command) Subcommands() []*Command {
 	return cmds
 }
 
+// FindActionCommands finds list of action commands by the executor scope.
+// NOTE:
+//  if @scopes is empty, all action commands are returned.
+func (c *Command) FindActionCommands(execScope ...Scope) []*Command {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	fn := c.app.scopeMatcherFunc
+	if fn == nil || len(execScope) == 0 {
+		return c.scopeCommands
+	}
+	scope := execScope[0]
+	list := make([]*Command, 0, len(c.scopeCommands))
+	for s, sc := range c.scopeCommandMap {
+		if fn(s, scope) == nil {
+			list = append(list, sc...)
+		}
+	}
+	return list
+}
+
 // Flags returns the formal flags.
 func (c *Command) Flags() map[string]*Flag {
 	if c.action == nil {
@@ -705,9 +791,19 @@ func (c *Context) CmdPathString() string {
 	return strings.Join(c.CmdPath(), " ")
 }
 
+// CmdScope returns the command scope.
+func (c *Context) CmdScope() Scope {
+	return c.cmd.scope
+}
+
+// ExecScope returns the executor scope.
+func (c *Context) ExecScope() Scope {
+	return c.cmd.scope
+}
+
 // UsageText returns the command usage.
-func (c *Context) UsageText(prefix ...string) string {
-	return c.cmd.UsageText(prefix...)
+func (c *Context) UsageText() string {
+	return c.cmd.UsageText(c.execScope)
 }
 
 // ThrowStatus creates a status with stack, and panic.
@@ -738,12 +834,66 @@ func (c *Command) SetParentVisible(visible bool) {
 	c.parentUsageVisible = visible
 }
 
-// UsageText returns the usage text.
-func (c *Command) UsageText(prefix ...string) string {
-	if len(prefix) > 0 {
-		return indent(c.usageText, prefix[0])
+// UsageText returns the usage text by by the executor scope.
+// NOTE:
+//  if @scopes is empty, all command usage are returned.
+func (c *Command) UsageText(execScope ...Scope) string {
+	fn := c.app.scopeMatcherFunc
+	if len(execScope) == 0 || fn == nil {
+		return c.usageText
 	}
-	return c.usageText
+	scope := execScope[0]
+	c.execScopeUsageTextsLock.RLock()
+	txt, ok := c.execScopeUsageTexts[scope]
+	c.execScopeUsageTextsLock.RUnlock()
+	if ok {
+		return txt
+	}
+	c.execScopeUsageTextsLock.Lock()
+	defer c.execScopeUsageTextsLock.Unlock()
+	txt, ok = c.execScopeUsageTexts[scope]
+	if ok {
+		return txt
+	}
+	m := make(map[*Command]bool, len(c.scopeCommands))
+	for s, sc := range c.scopeCommandMap {
+		if fn(s, scope) == nil {
+			for _, cmd := range sc {
+				m[cmd] = true
+			}
+		}
+	}
+	txt = c.createUsageLocked(m)
+	if c.execScopeUsageTexts == nil {
+		c.execScopeUsageTexts = make(map[Scope]string, 16)
+	}
+	c.execScopeUsageTexts[scope] = txt
+	return txt
+}
+
+// UsageText returns the usage text by by the executor scope.
+// NOTE:
+//  if @scopes is empty, all command usage are returned.
+func (a *App) UsageText(execScope ...Scope) string {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	fn := a.scopeMatcherFunc
+	if len(execScope) == 0 || fn == nil {
+		return a.usageText
+	}
+	scope := execScope[0]
+	a.execScopeUsageTextsLock.RLock()
+	txt, ok := a.execScopeUsageTexts[scope]
+	a.execScopeUsageTextsLock.RUnlock()
+	if ok {
+		return txt
+	}
+	txt = a.createUsageLocked(execScope...)
+	if a.execScopeUsageTexts == nil {
+		a.execScopeUsageTexts = make(map[Scope]string, 16)
+	}
+	a.execScopeUsageTexts[scope] = txt
+	return txt
 }
 
 // defaultAppUsageTemplate is the text template for the Default help topic.
@@ -763,10 +913,9 @@ COPYRIGHT:
   {{.Copyright}}{{end}}
 `))
 
-func (c *Command) updateAllUsageLocked() {
-	a := c.app
+func (a *App) updateUsageLocked() {
 	a.Command.updateUsageLocked()
-	text := a.Command.UsageText("  ")
+	text := goutil.Indent(a.Command.UsageText(), "  ")
 	data := map[string]interface{}{
 		"AppName":     a.appName,
 		"CmdName":     a.cmdName,
@@ -791,8 +940,37 @@ func (c *Command) updateAllUsageLocked() {
 	}
 }
 
+func (a *App) createUsageLocked(execScope ...Scope) string {
+	cmdUsageText := a.Command.UsageText(execScope...)
+	text := goutil.Indent(cmdUsageText, "  ")
+	data := map[string]interface{}{
+		"AppName":     a.appName,
+		"CmdName":     a.cmdName,
+		"Version":     a.version,
+		"Description": a.description,
+		"Authors":     a.authors,
+		"Usage":       text,
+		"Copyright":   a.copyright,
+	}
+	var buf bytes.Buffer
+	err := a.usageTemplate.Execute(&buf, data)
+	if err != nil {
+		panic(err)
+	}
+	s := buf.String()
+	var usageText string
+	for {
+		usageText = strings.Replace(s, "\n\n\n", "\n\n", -1)
+		if usageText == s {
+			return usageText
+		}
+		s = usageText
+	}
+	return usageText
+}
+
 func (c *Command) updateUsageLocked() {
-	c.usageText, c.usageBody = c.newUsageLocked()
+	c.usageText = c.newUsageLocked()
 	subcommands := c.Subcommands()
 	for _, subCmd := range subcommands {
 		subCmd.updateUsageLocked()
@@ -802,7 +980,20 @@ func (c *Command) updateUsageLocked() {
 	}
 }
 
-func (c *Command) newUsageLocked() (text string, body string) {
+func (c *Command) createUsageLocked(m map[*Command]bool) string {
+	if !m[c] {
+		return ""
+	}
+	usageText := c.newUsageLocked()
+	for _, subCmd := range c.Subcommands() {
+		if subCmd.parentUsageVisible {
+			usageText += subCmd.createUsageLocked(m)
+		}
+	}
+	return usageText
+}
+
+func (c *Command) newUsageLocked() (text string) {
 	var buf bytes.Buffer
 	flags := make([]*Flag, 0, len(c.filters)+1)
 	for _, filter := range c.filters {
@@ -819,7 +1010,7 @@ func (c *Command) newUsageLocked() (text string, body string) {
 	for _, f := range flags {
 		fn(f)
 	}
-	body = buf.String()
+	body := buf.String()
 	if c.parent != nil { // non-global command
 		var ellipsis string
 		if c.action == nil {
@@ -832,7 +1023,7 @@ func (c *Command) newUsageLocked() (text string, body string) {
 	}
 	body = strings.Replace(body, "-?", "?", -1)
 	text += body
-	return text, body
+	return text
 }
 
 // String makes Author comply to the Stringer interface, to allow an easy print in the templating process

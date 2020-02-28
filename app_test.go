@@ -226,3 +226,61 @@ func TestCommand(t *testing.T) {
 		app.LookupSubcommand("b").UsageText(),
 	)
 }
+
+func TestScope(t *testing.T) {
+	app := flagx.NewApp()
+	app.SetScopeMatcher(func(cmdScope, execScope flagx.Scope) error {
+		if cmdScope == execScope {
+			return nil
+		}
+		return fmt.Errorf("scopes are not equal: cmdScope=%d, execScope=%d", cmdScope, execScope)
+	})
+	app.SetCmdName("testapp")
+	app.SetDescription("this is a app for testing")
+	app.SetAuthors([]flagx.Author{{
+		Name:  "henrylee2cn",
+		Email: "henrylee2cn@gmail.com",
+	}})
+	app.SetValidator(func(v interface{}) error {
+		return vd.Validate(v)
+	})
+	app.AddFilter(new(Filter1))
+	// cmd: testapp a
+	app.AddSubcommand("a", "subcommand a").SetAction(new(Action1), flagx.Scope(1))
+	b := app.AddSubcommand("b", "subcommand b", flagx.FilterFunc(Filter2))
+	{
+		// cmd: testapp b c
+		b.AddSubcommand("c", "subcommand c").SetAction(new(Action2), flagx.Scope(2))
+		// cmd: testapp b d
+		b.AddSubaction("d", "subcommand d", flagx.ActionFunc(Action3))
+	}
+	app.SetNotFound(func(c *flagx.Context) {
+		fmt.Printf("NotFound: cmd=%q, uasge=%s\n", c.CmdPathString(), c.UsageText())
+	})
+
+	// test: testapp
+	// not found
+	stat := app.Exec(context.TODO(), []string{"-g=flagx", "false"}, flagx.Scope(1))
+	assert.True(t, stat.OK())
+
+	// test: testapp a
+	stat = app.Exec(context.TODO(), []string{"-g=henry", "true", "a", "-id", "1", "~/m/n"})
+	assert.False(t, stat.OK())
+	assert.EqualError(t, stat.Cause(), "scopes are not equal: cmdScope=1, execScope=0")
+
+	// test: testapp b
+	stat = app.Exec(context.TODO(), []string{"-g=flagx", "false", "b"})
+	assert.True(t, stat.OK())
+
+	// test: testapp b c
+	// not found
+	stat = app.Exec(context.TODO(), []string{"-g=flagx", "false", "b", "c", "name=henry"})
+	assert.EqualError(t, stat.Cause(), "scopes are not equal: cmdScope=2, execScope=0")
+
+	// test: testapp b d
+	stat = app.Exec(context.TODO(), []string{"-g=flagx", "false", "b", "d"})
+	assert.True(t, stat.OK())
+
+	t.Log("no scope:", app.UsageText())
+	t.Log("scope=0:", app.UsageText(flagx.Scope(0)))
+}

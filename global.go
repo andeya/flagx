@@ -487,15 +487,3 @@ func NonFlagIndex(nonFlag *Flag) (int, bool) {
 	idx, _, _ := getNonFlagIndex(nonFlag.Name)
 	return idx, idx >= 0
 }
-
-func indent(text, prefix string) string {
-	if len(prefix) == 0 {
-		return text
-	}
-	has := strings.HasSuffix(text, "\n")
-	text = prefix + strings.Replace(text, "\n", "\n"+prefix, -1)
-	if has {
-		return text[:len(text)-len(prefix)]
-	}
-	return text
-}

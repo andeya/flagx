@@ -76,9 +76,3 @@ func TestNextArgs(t *testing.T) {
 	assert.Equal(t, 1, fs.NFormalNonFlag())
 	assert.Equal(t, []string{"5s", "--", "-N=1", "-x", "y", "z"}, fs.NextArgs())
 }
-
-func TestIndent(t *testing.T) {
-	s := "a\nb\n\n"
-	r := indent(s, "0")
-	assert.Equal(t, "0a\n0b\n0\n", r)
-}
