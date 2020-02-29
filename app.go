@@ -472,11 +472,13 @@ func (c *Command) SetAction(action Action, scope ...Scope) {
 	if len(scope) > 0 {
 		c.scope = scope[0]
 	}
+	c.app.execScopeUsageTexts = make(map[Scope]string, len(c.app.execScopeUsageTexts))
 	c.bubbleSetScopeCmd(c.scope, nil)
 	c.app.updateUsageLocked()
 }
 
 func (c *Command) bubbleSetScopeCmd(scope Scope, subcmds []*Command) {
+	c.execScopeUsageTexts = make(map[Scope]string, len(c.execScopeUsageTexts))
 	if c.scopeCommandMap == nil {
 		c.scopeCommandMap = make(map[Scope][]*Command, 16)
 	}

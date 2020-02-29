@@ -248,6 +248,8 @@ func TestScope(t *testing.T) {
 	// cmd: testapp a
 	app.AddSubcommand("a", "subcommand a").SetAction(new(Action1), flagx.Scope(1))
 	b := app.AddSubcommand("b", "subcommand b", flagx.FilterFunc(Filter2))
+	t.Log("scope=0:", app.UsageText(flagx.Scope(0)))
+
 	{
 		// cmd: testapp b c
 		b.AddSubcommand("c", "subcommand c").SetAction(new(Action2), flagx.Scope(2))
