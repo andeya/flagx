@@ -176,7 +176,7 @@ type Action1 struct {
 	Path string `flag:"?0;usage=param path"`
 }
 
-func (a *Action1) Handle(c *flagx.Context) {
+func (a *Action1) Execute(c *flagx.Context) {
 	fmt.Printf("Action1: args=%+v, path=%q, object=%+v\n", c.Args(), c.CmdPathString(), a)
 }
 
@@ -184,7 +184,7 @@ type Action2 struct {
 	Name string `flag:"name;usage=param name"`
 }
 
-func (a *Action2) Handle(c *flagx.Context) {
+func (a *Action2) Execute(c *flagx.Context) {
 	fmt.Printf("Action2: args=%+v, path=%q, object=%+v\n", c.Args(), c.CmdPathString(), a)
 }
 
