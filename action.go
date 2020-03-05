@@ -123,8 +123,8 @@ func (c *Context) UsageText() string {
 }
 
 // ThrowStatus creates a status with stack, and panic.
-func (c *Context) ThrowStatus(code int32, msg string, cause interface{}) {
-	panic(status.New(code, msg, cause).TagStack(1))
+func (c *Context) ThrowStatus(code int32, msg string, cause ...interface{}) {
+	panic(status.New(code, msg, cause...).TagStack(1))
 }
 
 // CheckStatus if err!=nil, create a status with stack, and panic.
