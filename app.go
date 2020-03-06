@@ -93,19 +93,15 @@ var (
 	// TYPE:
 	//  func Throw(code int32, msg string, cause interface{})
 	ThrowStatus = status.Throw
-	// PanicStatus panic with stack trace.
-	// TYPE:
-	//  func Panic(stat *Status)
-	PanicStatus = status.Panic
 	// CatchStatus recovers the panic and returns status.
 	// NOTE:
 	//  Set `realStat` to true if a `Status` type is recovered
 	// Example:
 	//  var stat *Status
-	//  defer Catch(&stat)
+	//  defer CatchStatus(&stat)
 	// TYPE:
-	//  func Catch(statPtr **Status, realStat ...*bool)
-	CatchStatus = status.Catch
+	//  func CatchStatus(statPtr **Status, realStat ...*bool)
+	CatchStatus = status.CatchWithStack
 )
 
 // NewApp creates a new application.

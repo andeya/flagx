@@ -5,8 +5,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/golang/protobuf v1.3.2/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/henrylee2cn/ameda v1.3.4 h1:l8oksL4uikUUfnzkLUBi0fNc2p01MN8uiT7chhiB3Mw=
 github.com/henrylee2cn/ameda v1.3.4/go.mod h1:liZulR8DgHxdK+MEwvZIylGnmcjzQ6N6f2PlWe7nEO4=
-github.com/henrylee2cn/goutil v0.0.0-20200305163015-8af72dcdc88e h1:g1U2mk6s6l4ICIf0p+VtJ5swaGRPen72Nnh2gig84xE=
-github.com/henrylee2cn/goutil v0.0.0-20200305163015-8af72dcdc88e/go.mod h1:81hpTd0/0IQ9/yK+HKFg489/HHZWEpslCQtbV8M0P3U=
+github.com/henrylee2cn/goutil v0.0.0-20200306052258-f6f704b30e18 h1:APlepwlSWvTwD3jCWPVbVVrRmeLQUsRJGsH0J2ZhOXM=
+github.com/henrylee2cn/goutil v0.0.0-20200306052258-f6f704b30e18/go.mod h1:81hpTd0/0IQ9/yK+HKFg489/HHZWEpslCQtbV8M0P3U=
 github.com/nyaruka/phonenumbers v1.0.54/go.mod h1:sDaTZ/KPX5f8qyV9qN+hIm+4ZBARJrupC6LuhshJq1U=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
