@@ -118,7 +118,7 @@ func (f *FlagSet) StructVars(p interface{}) error {
 	if v.Kind() == reflect.Ptr {
 		v = ameda.DereferenceValue(v)
 		if v.Kind() == reflect.Struct {
-			structTypeIDs := make(map[int32]struct{}, 4)
+			structTypeIDs := make(map[uintptr]struct{}, 4)
 			return f.varFromStruct(v, structTypeIDs)
 		}
 	}

@@ -22,7 +22,7 @@ const (
 
 var timeDurationTypeID = ameda.ValueOf(time.Duration(0)).RuntimeTypeID()
 
-func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[int32]struct{}) error {
+func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[uintptr]struct{}) error {
 	v = ameda.DereferenceValue(v)
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("flagx: want struct pointer field, but got %s", v.Type().String())
