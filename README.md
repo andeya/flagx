@@ -116,7 +116,7 @@ import (
 	"testing"
 	"time"
 
-	vd "github.com/bytedance/go-tagexpr/validator"
+	vd "github.com/bytedance/go-tagexpr/v2/validator"
 	"github.com/henrylee2cn/flagx"
 	"github.com/stretchr/testify/assert"
 )
