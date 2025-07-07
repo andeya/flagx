@@ -128,7 +128,7 @@ func (a *App) CmdName() string {
 // NOTE:
 //
 //	remove '-' prefix automatically
-func (a *App) SetCmdName(cmdName string) {
+func (a *App) SetCmdName(cmdName string) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if cmdName == "" {
@@ -136,6 +136,7 @@ func (a *App) SetCmdName(cmdName string) {
 	}
 	a.cmdName = strings.TrimLeft(cmdName, "-")
 	a.updateUsageLocked()
+	return a
 }
 
 // Name returns the name(title) of the application.
@@ -150,11 +151,12 @@ func (a *App) Name() string {
 }
 
 // SetName sets the name(title) of the application.
-func (a *App) SetName(appName string) {
+func (a *App) SetName(appName string) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.appName = appName
 	a.updateUsageLocked()
+	return a
 }
 
 // Description returns description the of the application.
@@ -165,11 +167,12 @@ func (a *App) Description() string {
 }
 
 // SetDescription sets description the of the application.
-func (a *App) SetDescription(description string) {
+func (a *App) SetDescription(description string) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.description = description
 	a.updateUsageLocked()
+	return a
 }
 
 // Version returns the version of the application.
@@ -180,7 +183,7 @@ func (a *App) Version() string {
 }
 
 // SetVersion sets the version of the application.
-func (a *App) SetVersion(version string) {
+func (a *App) SetVersion(version string) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	version = strings.TrimPrefix(version, "v")
@@ -190,6 +193,7 @@ func (a *App) SetVersion(version string) {
 	}
 	a.version = version
 	a.updateUsageLocked()
+	return a
 }
 
 // Compiled returns the compilation date.
@@ -200,7 +204,7 @@ func (a *App) Compiled() time.Time {
 }
 
 // SetCompiled sets the compilation date.
-func (a *App) SetCompiled(date time.Time) {
+func (a *App) SetCompiled(date time.Time) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if date.IsZero() {
@@ -213,6 +217,7 @@ func (a *App) SetCompiled(date time.Time) {
 	}
 	a.compiled = date
 	a.updateUsageLocked()
+	return a
 }
 
 // Authors returns the list of all authors who contributed.
@@ -223,11 +228,12 @@ func (a *App) Authors() []Author {
 }
 
 // SetAuthors sets the list of all authors who contributed.
-func (a *App) SetAuthors(authors []Author) {
+func (a *App) SetAuthors(authors []Author) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.authors = authors
 	a.updateUsageLocked()
+	return a
 }
 
 // Copyright returns the copyright of the binary if any.
@@ -238,39 +244,44 @@ func (a *App) Copyright() string {
 }
 
 // SetCopyright sets copyright of the binary if any.
-func (a *App) SetCopyright(copyright string) {
+func (a *App) SetCopyright(copyright string) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.copyright = copyright
 	a.updateUsageLocked()
+	return a
 }
 
 // SetNotFound sets the action when the correct command cannot be found.
-func (a *App) SetNotFound(fn ActionFunc) {
+func (a *App) SetNotFound(fn ActionFunc) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.notFound = fn
+	return a
 }
 
 // SetValidator sets parameter validator for struct action and struct filter.
-func (a *App) SetValidator(fn ValidateFunc) {
+func (a *App) SetValidator(fn ValidateFunc) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.validator = fn
+	return a
 }
 
 // SetUsageTemplate sets usage template.
-func (a *App) SetUsageTemplate(tmpl *template.Template) {
+func (a *App) SetUsageTemplate(tmpl *template.Template) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.usageTemplate = tmpl
+	return a
 }
 
 // SetScopeMatcher sets the scope matching function.
-func (a *App) SetScopeMatcher(fn func(cmdScope, execScope Scope) error) {
+func (a *App) SetScopeMatcher(fn func(cmdScope, execScope Scope) error) *App {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	a.scopeMatcherFunc = fn
+	return a
 }
 
 // UsageText returns the usage text by by the executor scope.
