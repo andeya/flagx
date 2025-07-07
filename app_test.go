@@ -157,7 +157,8 @@ func (f *Filter1) Filter(c *flagx.Context, next flagx.ActionFunc) {
 }
 
 func Filter2(c *flagx.Context, next flagx.ActionFunc) {
-	t := time.Unix(1581572895, 0)
+	loc, _ := time.LoadLocation("Asia/Shanghai") // CST
+	t := time.Unix(1581572895, 0).In(loc)
 	fmt.Printf(
 		"Filter2 start: args=%+v, start at=%v\n",
 		c.Args(), t,
@@ -165,7 +166,7 @@ func Filter2(c *flagx.Context, next flagx.ActionFunc) {
 	defer func() {
 		fmt.Printf(
 			"Filter2 end: args=%+v, cost time=%v\n",
-			c.Args(), time.Unix(1581572895, 1000).Sub(t),
+			c.Args(), time.Unix(1581572895, 1000).In(loc).Sub(t),
 		)
 	}()
 	next(c)

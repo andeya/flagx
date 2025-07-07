@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/henrylee2cn/ameda"
+	"github.com/andeya/goutil"
 )
 
 type (
@@ -112,11 +112,12 @@ func (f *FlagSet) NFormalNonFlag() int {
 
 // StructVars defines flags based on struct tags and binds to fields.
 // NOTE:
-//  Not support nested fields
+//
+//	Not support nested fields
 func (f *FlagSet) StructVars(p interface{}) error {
 	v := reflect.ValueOf(p)
 	if v.Kind() == reflect.Ptr {
-		v = ameda.DereferenceValue(v)
+		v = goutil.DereferenceValue(v)
 		if v.Kind() == reflect.Struct {
 			structTypeIDs := make(map[uintptr]struct{}, 4)
 			return f.varFromStruct(v, structTypeIDs)
@@ -621,7 +622,12 @@ func getNonFlagIndex(name string) (int, bool, error) {
 	if s == name {
 		return -1, false, nil
 	}
-	i, err := ameda.StringToInt(s, true)
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		if s == "" {
+			err = nil
+		}
+	}
 	if err != nil || i < 0 {
 		return -1, true, errors.New("invalid non-flag index")
 	}

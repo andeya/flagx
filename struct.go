@@ -7,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/henrylee2cn/ameda"
+	"github.com/andeya/goutil"
+	"github.com/andeya/goutil/tpack"
 )
 
 // struct tags are used by *FlagSet.StructVars.
@@ -20,15 +21,15 @@ const (
 	tagKeyNonFlag = "?"
 )
 
-var timeDurationTypeID = ameda.ValueOf(time.Duration(0)).RuntimeTypeID()
+var timeDurationTypeID = tpack.Unpack(time.Duration(0)).RuntimeTypeID()
 
 func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[uintptr]struct{}) error {
-	v = ameda.DereferenceValue(v)
+	v = goutil.DereferenceValue(v)
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("flagx: want struct pointer field, but got %s", v.Type().String())
 	}
 	t := v.Type()
-	tid := ameda.RuntimeTypeID(t)
+	tid := tpack.RuntimeTypeID(t)
 	if _, ok := structTypeIDs[tid]; ok {
 		return nil
 	}
@@ -43,10 +44,10 @@ func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[uintptr]struc
 		if tag == tagKeyOmit {
 			continue
 		}
-		if !ameda.InitPointer(fv) {
+		if !goutil.InitPointer(fv) {
 			return fmt.Errorf("flagx: can not set field %s, type=%s", ft.Name, ft.Type.String())
 		}
-		fvElem := ameda.DereferenceValue(fv)
+		fvElem := goutil.DereferenceValue(fv)
 		kind := fvElem.Kind()
 		switch kind {
 		case reflect.String,
@@ -60,7 +61,7 @@ func (f *FlagSet) varFromStruct(v reflect.Value, structTypeIDs map[uintptr]struc
 
 		default:
 			if !ok && kind == reflect.Struct && ft.Anonymous {
-				err := f.varFromStruct(ameda.DereferenceValue(fv), structTypeIDs)
+				err := f.varFromStruct(goutil.DereferenceValue(fv), structTypeIDs)
 				if err != nil {
 					return err
 				}
@@ -172,7 +173,7 @@ func (f *FlagSet) varReflectValue(elem reflect.Value, names []string, def, usage
 			}
 		}
 	case reflect.Int64:
-		if ameda.RuntimeTypeID(elem.Type()) == timeDurationTypeID {
+		if tpack.RuntimeTypeID(elem.Type()) == timeDurationTypeID {
 			var b time.Duration
 			if def != "" {
 				b, err = time.ParseDuration(def)

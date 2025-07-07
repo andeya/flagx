@@ -10,8 +10,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/henrylee2cn/goutil"
-	"github.com/henrylee2cn/goutil/status"
+	"github.com/andeya/goutil"
+	"github.com/andeya/goutil/status"
 )
 
 type (
@@ -126,7 +126,8 @@ func (a *App) CmdName() string {
 
 // SetCmdName sets the command name of the application.
 // NOTE:
-//  remove '-' prefix automatically
+//
+//	remove '-' prefix automatically
 func (a *App) SetCmdName(cmdName string) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -274,7 +275,8 @@ func (a *App) SetScopeMatcher(fn func(cmdScope, execScope Scope) error) {
 
 // UsageText returns the usage text by by the executor scope.
 // NOTE:
-//  if @scopes is empty, all command usage are returned.
+//
+//	if @scopes is empty, all command usage are returned.
 func (a *App) UsageText(execScope ...Scope) string {
 	a.lock.RLock()
 	defer a.lock.RUnlock()

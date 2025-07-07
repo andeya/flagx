@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/henrylee2cn/ameda"
-	"github.com/henrylee2cn/goutil/status"
+	"github.com/andeya/goutil"
+	"github.com/andeya/goutil/status"
 )
 
 // Command a command object
@@ -62,14 +62,16 @@ func (c *Command) GetMeta(key interface{}) interface{} {
 
 // AddSubaction adds a subcommand and its action.
 // NOTE:
-//  panic when something goes wrong
+//
+//	panic when something goes wrong
 func (c *Command) AddSubaction(cmdName, description string, action Action, scope ...Scope) {
 	c.AddSubcommand(cmdName, description).SetAction(action, scope...)
 }
 
 // AddSubcommand adds a subcommand.
 // NOTE:
-//  panic when something goes wrong
+//
+//	panic when something goes wrong
 func (c *Command) AddSubcommand(cmdName, description string, filters ...Filter) *Command {
 	if cmdName == "" {
 		panic("command name is empty")
@@ -91,15 +93,16 @@ func (c *Command) AddSubcommand(cmdName, description string, filters ...Filter) 
 
 // AddFilter adds the filter action.
 // NOTE:
-//  if filter is a struct, it can implement the copier interface;
-//  panic when something goes wrong
+//
+//	if filter is a struct, it can implement the copier interface;
+//	panic when something goes wrong
 func (c *Command) AddFilter(filters ...Filter) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	for _, filter := range filters {
 		var obj filterObject
 		obj.flagSet = NewFlagSet(c.cmdName, ContinueOnError|ContinueOnUndefined)
-		elemType := ameda.DereferenceType(reflect.TypeOf(filter))
+		elemType := goutil.DereferenceType(reflect.TypeOf(filter))
 		switch elemType.Kind() {
 		case reflect.Struct:
 			var ok bool
@@ -127,8 +130,9 @@ func (c *Command) AddFilter(filters ...Filter) {
 
 // SetAction sets the action of the command.
 // NOTE:
-//  if action is a struct, it can implement the copier interface;
-//  panic when something goes wrong.
+//
+//	if action is a struct, it can implement the copier interface;
+//	panic when something goes wrong.
 func (c *Command) SetAction(action Action, scope ...Scope) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -141,7 +145,7 @@ func (c *Command) SetAction(action Action, scope ...Scope) {
 	var obj actionObject
 	obj.cmd = c
 	obj.flagSet = NewFlagSet(c.cmdName, ContinueOnError|ContinueOnUndefined)
-	elemType := ameda.DereferenceType(reflect.TypeOf(action))
+	elemType := goutil.DereferenceType(reflect.TypeOf(action))
 	switch elemType.Kind() {
 	case reflect.Struct:
 		var ok bool
@@ -199,8 +203,9 @@ func cmdsDistinctAndSort(cmds []*Command) []*Command {
 
 // Exec executes the command.
 // NOTE:
-//  @arguments does not contain the command name;
-//  the default value of @scope is 0.
+//
+//	@arguments does not contain the command name;
+//	the default value of @scope is 0.
 func (c *Command) Exec(ctx context.Context, arguments []string, execScope ...Scope) (stat *Status) {
 	defer status.Catch(&stat)
 	var s Scope
@@ -321,7 +326,7 @@ func (c *Command) Path() (p []string) {
 	for {
 		if r.parent == nil {
 			p = append(p, r.cmdName)
-			ameda.StringsReverse(p)
+			goutil.StringsReverse(p)
 			return
 		}
 		p = append(p, r.cmdName)
@@ -336,7 +341,8 @@ func (c *Command) PathString() string {
 
 // Root returns the root command.
 // NOTE:
-//  returns nil if it does not exist.
+//
+//	returns nil if it does not exist.
 func (c *Command) Root() *Command {
 	r := c
 	for {
@@ -349,14 +355,16 @@ func (c *Command) Root() *Command {
 
 // Parent returns the parent command.
 // NOTE:
-//  returns nil if it does not exist.
+//
+//	returns nil if it does not exist.
 func (c *Command) Parent() *Command {
 	return c.parent
 }
 
 // LookupSubcommand lookups subcommand by path names.
 // NOTE:
-//  returns nil if it does not exist.
+//
+//	returns nil if it does not exist.
 func (c *Command) LookupSubcommand(pathCmdNames ...string) *Command {
 	r := c
 	for _, name := range pathCmdNames {
@@ -387,7 +395,8 @@ func (c *Command) Subcommands() []*Command {
 
 // FindActionCommands finds list of action commands by the executor scope.
 // NOTE:
-//  if @scopes is empty, all action commands are returned.
+//
+//	if @scopes is empty, all action commands are returned.
 func (c *Command) FindActionCommands(execScope ...Scope) []*Command {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -425,7 +434,8 @@ func (c *Command) SetParentVisible(visible bool) {
 
 // UsageText returns the usage text by by the executor scope.
 // NOTE:
-//  if @scopes is empty, all command usage are returned.
+//
+//	if @scopes is empty, all command usage are returned.
 func (c *Command) UsageText(execScope ...Scope) string {
 	fn := c.app.scopeMatcherFunc
 	if len(execScope) == 0 || fn == nil {

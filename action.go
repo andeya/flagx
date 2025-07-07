@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/henrylee2cn/goutil/status"
+	"github.com/andeya/goutil/status"
 )
 
 type (
@@ -129,7 +129,8 @@ func (c *Context) ThrowStatus(code int32, msg string, cause ...interface{}) {
 
 // CheckStatus if err!=nil, create a status with stack, and panic.
 // NOTE:
-//  If err!=nil and msg=="", error text is set to msg
+//
+//	If err!=nil and msg=="", error text is set to msg
 func (c *Context) CheckStatus(err error, code int32, msg string, whenError ...func()) {
 	if err == nil {
 		return

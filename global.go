@@ -320,8 +320,10 @@ func Usage() {
 // a usage message showing the default settings of all defined
 // command-line flags.
 // For an integer valued flag x, the default output has the form
+//
 //	-x int
 //		usage-message-for-x (default 7)
+//
 // The usage message will appear on a separate line for anything but
 // a bool flag with a one-byte name. For bool flags, the type is
 // omitted and if the flag name is one byte the usage message appears
@@ -331,8 +333,11 @@ func Usage() {
 // string; the first such item in the message is taken to be a parameter
 // name to show in the message and the back quotes are stripped from
 // the message when displayed. For instance, given
+//
 //	flag.String("I", "", "search `directory` for include files")
+//
 // the output will be
+//
 //	-I directory
 //		search directory for include files.
 //
@@ -360,7 +365,8 @@ func StringVar(p *string, name string, value string, usage string) {
 
 // StructVars defines flags based on struct tags and binds to fields.
 // NOTE:
-//  Not support nested fields
+//
+//	Not support nested fields
 func StructVars(p interface{}) error {
 	return CommandLine.StructVars(p)
 }
