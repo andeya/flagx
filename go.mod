@@ -1,4 +1,4 @@
-module github.com/henrylee2cn/flagx
+module github.com/andeya/flagx
 
 go 1.13
 

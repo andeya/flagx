@@ -1,4 +1,4 @@
-# flagx [![report card](https://goreportcard.com/badge/github.com/henrylee2cn/flagx?style=flat-square)](http://goreportcard.com/report/henrylee2cn/flagx) [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/github.com/henrylee2cn/flagx)
+# flagx [![report card](https://goreportcard.com/badge/github.com/andeya/flagx?style=flat-square)](http://goreportcard.com/report/andeya/flagx) [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/github.com/andeya/flagx)
 
 Standard flag package extension with more features, such as struct flag, app framework, etc.
 
@@ -117,7 +117,7 @@ import (
 	"time"
 
 	vd "github.com/bytedance/go-tagexpr/v2/validator"
-	"github.com/henrylee2cn/flagx"
+	"github.com/andeya/flagx"
 	"github.com/stretchr/testify/assert"
 )
 

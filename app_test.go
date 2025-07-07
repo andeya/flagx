@@ -1,4 +1,4 @@
-package flagx_test
+package flagx
 
 import (
 	"context"
@@ -7,15 +7,14 @@ import (
 	"time"
 
 	vd "github.com/bytedance/go-tagexpr/v2/validator"
-	"github.com/henrylee2cn/flagx"
 	"github.com/stretchr/testify/assert"
 )
 
 func ExampleApp() {
-	app := flagx.NewApp()
+	app := NewApp()
 	app.SetCmdName("testapp")
 	app.SetDescription("this is a app for testing")
-	app.SetAuthors([]flagx.Author{{
+	app.SetAuthors([]Author{{
 		Name:  "henrylee2cn",
 		Email: "henrylee2cn@gmail.com",
 	}})
@@ -25,14 +24,14 @@ func ExampleApp() {
 	app.AddFilter(new(Filter1))
 	// cmd: testapp a
 	app.AddSubaction("a", "subcommand a", new(Action1))
-	b := app.AddSubcommand("b", "subcommand b", flagx.FilterFunc(Filter2))
+	b := app.AddSubcommand("b", "subcommand b", FilterFunc(Filter2))
 	{
 		// cmd: testapp b c
 		b.AddSubaction("c", "subcommand c", new(Action2))
 		// cmd: testapp b d
-		b.AddSubaction("d", "subcommand d", flagx.ActionFunc(Action3))
+		b.AddSubaction("d", "subcommand d", ActionFunc(Action3))
 	}
-	app.SetNotFound(func(c *flagx.Context) {
+	app.SetNotFound(func(c *Context) {
 		fmt.Printf("NotFound: cmd=%q, uasge=%s\n", c.CmdPathString(), c.UsageText())
 	})
 
@@ -146,7 +145,7 @@ type Filter1 struct {
 	V bool   `flag:"?0;usage=param view"`
 }
 
-func (f *Filter1) Filter(c *flagx.Context, next flagx.ActionFunc) {
+func (f *Filter1) Filter(c *Context, next ActionFunc) {
 	if f.V {
 		fmt.Printf("Filter1 start: args=%+v, G=%s\n", c.Args(), f.G)
 	} else {
@@ -156,7 +155,7 @@ func (f *Filter1) Filter(c *flagx.Context, next flagx.ActionFunc) {
 	next(c)
 }
 
-func Filter2(c *flagx.Context, next flagx.ActionFunc) {
+func Filter2(c *Context, next ActionFunc) {
 	loc, _ := time.LoadLocation("Asia/Shanghai") // CST
 	t := time.Unix(1581572895, 0).In(loc)
 	fmt.Printf(
@@ -177,7 +176,7 @@ type Action1 struct {
 	Path string `flag:"?0;usage=param path"`
 }
 
-func (a *Action1) Execute(c *flagx.Context) {
+func (a *Action1) Execute(c *Context) {
 	fmt.Printf("Action1: args=%+v, path=%q, object=%+v\n", c.Args(), c.CmdPathString(), a)
 }
 
@@ -185,24 +184,24 @@ type Action2 struct {
 	Name string `flag:"name;usage=param name"`
 }
 
-func (a *Action2) Execute(c *flagx.Context) {
+func (a *Action2) Execute(c *Context) {
 	fmt.Printf("Action2: args=%+v, path=%q, object=%+v\n", c.Args(), c.CmdPathString(), a)
 }
 
-func Action3(c *flagx.Context) {
+func Action3(c *Context) {
 	fmt.Printf("Action3: args=%+v, path=%q\n", c.Args(), c.CmdPathString())
 }
 
 func TestCommand(t *testing.T) {
-	app := flagx.NewApp()
+	app := NewApp()
 	app.SetCmdName("testapp")
 	app.AddSubaction("a", "subcommand a", new(Action1))
-	b := app.AddSubcommand("b", "subcommand b", flagx.FilterFunc(Filter2))
+	b := app.AddSubcommand("b", "subcommand b", FilterFunc(Filter2))
 	{
 		b.AddSubaction("c", "subcommand c", new(Action2))
-		b.AddSubaction("d", "subcommand d", flagx.ActionFunc(Action3))
+		b.AddSubaction("d", "subcommand d", ActionFunc(Action3))
 	}
-	app.SetNotFound(func(c *flagx.Context) {
+	app.SetNotFound(func(c *Context) {
 		fmt.Printf("NotFound: args=%+v, path=%q\n", c.Args(), c.CmdPathString())
 	})
 	assert.NotNil(t, app.LookupSubcommand("a"))
@@ -229,8 +228,8 @@ func TestCommand(t *testing.T) {
 }
 
 func TestScope(t *testing.T) {
-	app := flagx.NewApp()
-	app.SetScopeMatcher(func(cmdScope, execScope flagx.Scope) error {
+	app := NewApp()
+	app.SetScopeMatcher(func(cmdScope, execScope Scope) error {
 		if cmdScope == execScope {
 			return nil
 		}
@@ -238,7 +237,7 @@ func TestScope(t *testing.T) {
 	})
 	app.SetCmdName("testapp")
 	app.SetDescription("this is a app for testing")
-	app.SetAuthors([]flagx.Author{{
+	app.SetAuthors([]Author{{
 		Name:  "henrylee2cn",
 		Email: "henrylee2cn@gmail.com",
 	}})
@@ -247,23 +246,23 @@ func TestScope(t *testing.T) {
 	})
 	app.AddFilter(new(Filter1))
 	// cmd: testapp a
-	app.AddSubcommand("a", "subcommand a").SetAction(new(Action1), flagx.Scope(1))
-	b := app.AddSubcommand("b", "subcommand b", flagx.FilterFunc(Filter2))
-	t.Log("scope=0:", app.UsageText(flagx.Scope(0)))
+	app.AddSubcommand("a", "subcommand a").SetAction(new(Action1), Scope(1))
+	b := app.AddSubcommand("b", "subcommand b", FilterFunc(Filter2))
+	t.Log("scope=0:", app.UsageText(Scope(0)))
 
 	{
 		// cmd: testapp b c
-		b.AddSubcommand("c", "subcommand c").SetAction(new(Action2), flagx.Scope(2))
+		b.AddSubcommand("c", "subcommand c").SetAction(new(Action2), Scope(2))
 		// cmd: testapp b d
-		b.AddSubaction("d", "subcommand d", flagx.ActionFunc(Action3))
+		b.AddSubaction("d", "subcommand d", ActionFunc(Action3))
 	}
-	app.SetNotFound(func(c *flagx.Context) {
+	app.SetNotFound(func(c *Context) {
 		fmt.Printf("NotFound: cmd=%q, uasge=%s\n", c.CmdPathString(), c.UsageText())
 	})
 
 	// test: testapp
 	// not found
-	stat := app.Exec(context.TODO(), []string{"-g=flagx", "false"}, flagx.Scope(1))
+	stat := app.Exec(context.TODO(), []string{"-g=flagx", "false"}, Scope(1))
 	assert.True(t, stat.OK())
 
 	// test: testapp a
@@ -285,5 +284,5 @@ func TestScope(t *testing.T) {
 	assert.True(t, stat.OK())
 
 	t.Log("no scope:", app.UsageText())
-	t.Log("scope=0:", app.UsageText(flagx.Scope(0)))
+	t.Log("scope=0:", app.UsageText(Scope(0)))
 }
